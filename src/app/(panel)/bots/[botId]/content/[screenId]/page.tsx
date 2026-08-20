@@ -7,10 +7,13 @@ import {
   addButton,
   deleteButton,
   deleteScreen,
+  duplicateScreen,
   moveButton,
   toggleButtonRow,
   updateScreen,
 } from "../actions";
+import { ButtonFields } from "../button-fields";
+import { mediaUrl } from "@/lib/media";
 import { ScreenEditor } from "@/components/screen-editor";
 import { ActionForm, ConfirmButton, FormNotice, InlineAction, SubmitButton } from "@/components/forms";
 import { Badge, Card, CardHeader, Empty, Field } from "@/components/ui";
@@ -47,7 +50,7 @@ export default async function ScreenEditorPage({
   });
   if (!screen) notFound();
 
-  const [allScreens, webApps] = await Promise.all([
+  const [allScreens, webApps, assets] = await Promise.all([
     prisma.screen.findMany({
       where: { botId },
       select: { id: true, key: true, name: true },
@@ -57,7 +60,18 @@ export default async function ScreenEditorPage({
       where: { botId, isActive: true },
       select: { id: true, name: true },
     }),
+    prisma.mediaAsset.findMany({
+      where: { botId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
   ]);
+
+  const mediaOptions = assets.map((a) => ({
+    url: mediaUrl(a.publicKey),
+    label: a.fileName,
+    kind: a.kind,
+  }));
 
   // Ko'rinish uchun tugmalarni qatorlarga guruhlash
   const rowMap = new Map<number, string[]>();
@@ -79,14 +93,23 @@ export default async function ScreenEditorPage({
         >
           ← Barcha ekranlar
         </Link>
-        {screen.key !== "start" && (
+        <div className="flex items-center gap-2">
           <ConfirmButton
-            action={deleteScreen.bind(null, botId, screenId)}
-            confirm={`"${screen.name}" ekrani o'chirilsinmi? Unga ishora qiluvchi tugmalar ishlamay qoladi.`}
+            action={duplicateScreen.bind(null, botId, screenId)}
+            confirm={`"${screen.name}" ekranidan nusxa olinsinmi?`}
+            tone="ghost"
           >
-            Ekranni o'chirish
+            Nusxa olish
           </ConfirmButton>
-        )}
+          {screen.key !== "start" && (
+            <ConfirmButton
+              action={deleteScreen.bind(null, botId, screenId)}
+              confirm={`"${screen.name}" ekrani o'chirilsinmi? Unga ishora qiluvchi tugmalar ishlamay qoladi.`}
+            >
+              Ekranni o'chirish
+            </ConfirmButton>
+          )}
+        </div>
       </div>
 
       <ScreenEditor
@@ -106,6 +129,7 @@ export default async function ScreenEditorPage({
         translations={screen.translations}
         buttonRows={buttonRows}
         screenKeys={allScreens.map((s) => s.key)}
+        mediaOptions={mediaOptions}
       />
 
       <Card>
@@ -126,9 +150,12 @@ export default async function ScreenEditorPage({
             {screen.buttons.map((b, i) => (
               <div key={b.id} className="flex items-center gap-3 px-5 py-2.5">
                 <span className="tabular w-8 text-xs text-faint">{b.row}.{b.col}</span>
-                <span className="min-w-0 flex-1 truncate text-sm">
+                <Link
+                  href={`/bots/${botId}/content/${screenId}/buttons/${b.id}`}
+                  className="min-w-0 flex-1 truncate text-sm transition-colors hover:text-amber-400"
+                >
                   {pickLabel(b.labels, bot.defaultLocale, bot.defaultLocale)}
-                </span>
+                </Link>
                 <Badge tone={b.action === "URL" || b.action === "WEBAPP" ? "info" : "neutral"}>
                   {ACTION_LABEL[b.action] ?? b.action}
                 </Badge>
@@ -164,52 +191,7 @@ export default async function ScreenEditorPage({
           className="space-y-4 border-t border-ink-600 p-5"
         >
           <div className="eyebrow">Yangi tugma</div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {bot.locales.map((locale) => (
-              <Field key={locale} label={`Matn (${locale})`}>
-                <input name={`label_${locale}`} placeholder="📦 Buyurtma berish" />
-              </Field>
-            ))}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Bosilganda">
-              <select name="action" defaultValue="SCREEN">
-                <option value="SCREEN">Boshqa ekranga o&apos;tadi</option>
-                <option value="URL">Havolani ochadi</option>
-                <option value="WEBAPP">Mini App ochadi</option>
-                <option value="BACK">Orqaga qaytaradi</option>
-                <option value="SHARE_CONTACT">Telefon raqamni so&apos;raydi</option>
-                <option value="SHARE_LOCATION">Manzilni so&apos;raydi</option>
-              </select>
-            </Field>
-            <Field label="Maqsad ekran">
-              <select name="targetScreenId" defaultValue="">
-                <option value="">— tanlanmagan —</option>
-                {allScreens.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.key})
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Havola" hint="«Havolani ochadi» tanlansa to'ldiriladi.">
-              <input name="url" placeholder="https://example.uz" className="font-mono text-xs" />
-            </Field>
-            <Field label="Web App" hint="«Mini App ochadi» tanlansa to'ldiriladi.">
-              <select name="webAppId" defaultValue="">
-                <option value="">— tanlanmagan —</option>
-                {webApps.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
+          <ButtonFields locales={bot.locales} screens={allScreens} webApps={webApps} />
 
           <FormNotice />
           <SubmitButton tone="ghost" pendingLabel="Qo'shilmoqda…">

@@ -47,8 +47,15 @@ export async function createBroadcast(
 ): Promise<ActionState> {
   const { user } = await requireBot(botId);
 
+  const screenId = String(formData.get("screenId") ?? "") || null;
   const text = String(formData.get("text") ?? "").trim();
-  if (!text) return { error: "Xabar matnini kiriting" };
+  if (!screenId && !text) {
+    return { error: "Xabar matnini kiriting yoki tayyor ekranni tanlang" };
+  }
+  if (screenId) {
+    const screen = await prisma.screen.findFirst({ where: { id: screenId, botId } });
+    if (!screen) return { error: "Tanlangan ekran topilmadi" };
+  }
 
   const scheduledRaw = String(formData.get("scheduledAt") ?? "").trim();
   const scheduledAt = scheduledRaw ? new Date(scheduledRaw) : null;
@@ -66,6 +73,7 @@ export async function createBroadcast(
     data: {
       botId,
       name: String(formData.get("name") ?? "").trim() || `Xabar ${new Date().toLocaleDateString("uz-UZ")}`,
+      screenId,
       text,
       parseMode: String(formData.get("parseMode") ?? "HTML"),
       mediaType: String(formData.get("mediaType") ?? "NONE") as never,
@@ -82,6 +90,58 @@ export async function createBroadcast(
 
   await audit(user.id, "broadcast.create", "Broadcast", broadcast.id);
   redirect(`/bots/${botId}/broadcasts/${broadcast.id}`);
+}
+
+/** Faqat yuborilmagan qoralamani tahrirlash mumkin. */
+export async function updateBroadcast(
+  botId: string,
+  broadcastId: string,
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const { user } = await requireBot(botId);
+  const existing = await prisma.broadcast.findFirst({
+    where: { id: broadcastId, botId },
+  });
+  if (!existing) return { error: "Xabar topilmadi" };
+  if (!["DRAFT", "PAUSED", "SCHEDULED", "FAILED"].includes(existing.status)) {
+    return { error: "Yuborilgan xabarni tahrirlab bo'lmaydi" };
+  }
+
+  const screenId = String(formData.get("screenId") ?? "") || null;
+  const text = String(formData.get("text") ?? "").trim();
+  if (!screenId && !text) {
+    return { error: "Xabar matnini kiriting yoki tayyor ekranni tanlang" };
+  }
+
+  const scheduledRaw = String(formData.get("scheduledAt") ?? "").trim();
+  const scheduledAt = scheduledRaw ? new Date(scheduledRaw) : null;
+  if (scheduledAt && Number.isNaN(scheduledAt.getTime())) {
+    return { error: "Rejalashtirilgan vaqt noto'g'ri" };
+  }
+
+  const segment = readSegment(formData);
+  const total = await prisma.botUser.count({ where: segmentWhere(botId, segment) });
+
+  await prisma.broadcast.update({
+    where: { id: broadcastId },
+    data: {
+      name: String(formData.get("name") ?? existing.name).trim() || existing.name,
+      screenId,
+      text,
+      parseMode: String(formData.get("parseMode") ?? "HTML"),
+      mediaType: String(formData.get("mediaType") ?? "NONE") as never,
+      mediaUrl: String(formData.get("mediaUrl") ?? "").trim() || null,
+      buttons: readButtons(formData) as never,
+      disableNotification: formData.get("disableNotification") === "on",
+      segment: segment as never,
+      scheduledAt,
+      totalCount: total,
+    },
+  });
+
+  await audit(user.id, "broadcast.update", "Broadcast", broadcastId);
+  redirect(`/bots/${botId}/broadcasts/${broadcastId}`);
 }
 
 /** Xabarni navbatga qo'yadi. Rejalashtirilgan bo'lsa kechikish bilan. */

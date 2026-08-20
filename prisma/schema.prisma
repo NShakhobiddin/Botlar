@@ -84,6 +84,8 @@ model Bot {
   events     Event[]
   webApps    WebApp[]
   dailyStats DailyStat[]
+  triggers   Trigger[]
+  media      MediaAsset[]
 }
 
 model BotCommand {
@@ -139,6 +141,7 @@ model Screen {
   buttons      Button[]
   commands     BotCommand[]
   broadcasts   Broadcast[]
+  triggers     Trigger[]
   linkedFrom   Button[]            @relation("ButtonTarget")
 
   @@unique([botId, key])
@@ -186,6 +189,50 @@ model Button {
   commandKey     String?
 
   @@index([screenId])
+}
+
+enum MatchType {
+  EXACT
+  CONTAINS
+  STARTS_WITH
+}
+
+/// Trigger — foydalanuvchi yozgan matnga qarab ekran ochish.
+/// Masalan "narx" so'zi yozilsa — narxlar ekrani.
+model Trigger {
+  id            String    @id @default(cuid())
+  botId         String
+  bot           Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  pattern       String
+  matchType     MatchType @default(CONTAINS)
+  caseSensitive Boolean   @default(false)
+  screenId      String
+  screen        Screen    @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  isActive      Boolean   @default(true)
+  /// Kichik raqam oldin tekshiriladi.
+  priority      Int       @default(0)
+  hitCount      Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  @@index([botId, isActive, priority])
+}
+
+/// Panelga yuklangan rasm/video/fayl. Telegram uni ochiq havola orqali oladi.
+model MediaAsset {
+  id       String    @id @default(cuid())
+  botId    String
+  bot      Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  fileName String
+  mimeType String
+  size     Int
+  kind     MediaType
+  /// Ochiq havoladagi tasodifiy kalit — fayl nomi taxmin qilinmasin.
+  publicKey String   @unique
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  @@index([botId, createdAt])
 }
 
 // -------------------------------------------------------------- bot userlari

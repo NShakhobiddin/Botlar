@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireBot } from "@/lib/auth";
 import { syncCommands } from "../../actions";
 import { createScreen, deleteCommand, saveCommand } from "./actions";
+import { createTrigger, deleteTrigger, toggleTrigger } from "./trigger-actions";
 import { ActionForm, ConfirmButton, FormNotice, SubmitButton } from "@/components/forms";
 import {
   Badge,
@@ -17,6 +18,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const MATCH_LABEL: Record<string, string> = {
+  CONTAINS: "Ichida bo'lsa",
+  EXACT: "Aynan teng",
+  STARTS_WITH: "Shu bilan boshlansa",
+};
+
 export default async function ContentPage({
   params,
 }: {
@@ -25,7 +32,7 @@ export default async function ContentPage({
   const { botId } = await params;
   const { bot } = await requireBot(botId);
 
-  const [screens, commands] = await Promise.all([
+  const [screens, commands, triggers] = await Promise.all([
     prisma.screen.findMany({
       where: { botId },
       include: {
@@ -39,7 +46,14 @@ export default async function ContentPage({
       include: { screen: { select: { name: true, key: true } } },
       orderBy: { command: "asc" },
     }),
+    prisma.trigger.findMany({
+      where: { botId },
+      include: { screen: { select: { name: true } } },
+      orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
+    }),
   ]);
+
+  const hasFallback = screens.some((s) => s.key === "fallback");
 
   async function syncAction() {
     "use server";
@@ -104,6 +118,125 @@ export default async function ContentPage({
             </tbody>
           </Table>
         )}
+      </Card>
+
+      {!hasFallback && (
+        <Card className="border-amber-500/25">
+          <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+            <div>
+              <div className="eyebrow mb-1">Tavsiya</div>
+              <p className="text-sm">
+                <span className="font-mono text-amber-400">fallback</span> kalitli ekran
+                yarating
+              </p>
+              <p className="mt-1 max-w-xl text-xs text-muted">
+                Bot tushunmagan xabarga shu ekran javob beradi. Hozir bunday xabarlarga
+                bot umuman javob bermaydi — foydalanuvchi bot ishlamayapti deb o&apos;ylashi
+                mumkin.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader
+          eyebrow="Matnga javob"
+          title="Kalit so'zlar"
+          action={
+            <span className="text-xs text-faint">
+              Buyruq ham, tugma ham bo'lmagan matnlar shu ro'yxat bo'yicha tekshiriladi
+            </span>
+          }
+        />
+
+        {triggers.length === 0 ? (
+          <Empty
+            title="Kalit so'z yo'q"
+            hint="Masalan «narx» so'zi yozilganda narxlar ekranini ochish."
+          />
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Kalit so'z</Th>
+                <Th>Qanday solishtiriladi</Th>
+                <Th>Ochiladigan ekran</Th>
+                <Th className="text-right">Ishlagan</Th>
+                <Th />
+              </tr>
+            </thead>
+            <tbody>
+              {triggers.map((t) => (
+                <tr key={t.id} className="transition-colors hover:bg-ink-800">
+                  <Td>
+                    <span className={t.isActive ? "font-mono text-sm" : "font-mono text-sm text-faint line-through"}>
+                      {t.pattern}
+                    </span>
+                  </Td>
+                  <Td className="text-xs text-muted">{MATCH_LABEL[t.matchType]}</Td>
+                  <Td className="text-sm">{t.screen.name}</Td>
+                  <Td className="tabular text-right text-muted">{t.hitCount}</Td>
+                  <Td className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <ConfirmButton
+                        action={toggleTrigger.bind(null, botId, t.id)}
+                        confirm={t.isActive ? "Kalit so'z o'chirib qo'yilsinmi?" : "Kalit so'z yoqilsinmi?"}
+                        tone="quiet"
+                      >
+                        {t.isActive ? "O'chirib qo'yish" : "Yoqish"}
+                      </ConfirmButton>
+                      <ConfirmButton
+                        action={deleteTrigger.bind(null, botId, t.id)}
+                        confirm={`"${t.pattern}" o'chirilsinmi?`}
+                        tone="quiet"
+                      >
+                        ✕
+                      </ConfirmButton>
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+
+        <ActionForm
+          action={createTrigger.bind(null, botId)}
+          className="space-y-4 border-t border-ink-600 p-5"
+        >
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Field label="Kalit so'z">
+              <input name="pattern" required placeholder="narx" className="font-mono" />
+            </Field>
+            <Field label="Solishtirish">
+              <select name="matchType" defaultValue="CONTAINS">
+                <option value="CONTAINS">Ichida bo'lsa</option>
+                <option value="EXACT">Aynan teng bo'lsa</option>
+                <option value="STARTS_WITH">Shu bilan boshlansa</option>
+              </select>
+            </Field>
+            <Field label="Ochiladigan ekran">
+              <select name="screenId" defaultValue="">
+                <option value="">— tanlang —</option>
+                {screens.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Tartib" hint="Kichik raqam oldin tekshiriladi.">
+              <input name="priority" type="number" defaultValue={0} className="font-mono" />
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="caseSensitive" />
+            Katta-kichik harf farqlansin
+          </label>
+          <FormNotice />
+          <SubmitButton tone="ghost">Kalit so&apos;z qo&apos;shish</SubmitButton>
+        </ActionForm>
       </Card>
 
       <div className="grid gap-5 lg:grid-cols-2">

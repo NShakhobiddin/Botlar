@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { inviteUser, toggleUserActive } from "./actions";
+import { changePassword, inviteUser, toggleUserActive } from "./actions";
 import { ActionForm, ConfirmButton, FormNotice, SubmitButton } from "@/components/forms";
 import {
   Badge,
@@ -130,6 +130,35 @@ export default async function TeamPage() {
               </div>
               <FormNotice />
               <SubmitButton pendingLabel="Qo'shilmoqda…">Qo&apos;shish</SubmitButton>
+            </ActionForm>
+          </Card>
+        )}
+
+        {isOwner && (
+          <Card>
+            <CardHeader eyebrow="Tiklash" title="Parolni yangilash" />
+            <ActionForm action={changePassword} className="space-y-4 p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Kim uchun">
+                  <select name="userId" defaultValue="" required>
+                    <option value="" disabled>
+                      — tanlang —
+                    </option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.email})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Yangi parol" hint="Kamida 10 belgi. Xavfsiz kanal orqali yetkazing.">
+                  <input name="password" required minLength={10} className="font-mono" />
+                </Field>
+              </div>
+              <FormNotice />
+              <SubmitButton tone="ghost" pendingLabel="Yangilanmoqda…">
+                Parolni yangilash
+              </SubmitButton>
             </ActionForm>
           </Card>
         )}

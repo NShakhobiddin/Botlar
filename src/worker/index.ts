@@ -15,6 +15,7 @@ import { botToken } from "@/lib/bots";
 import { send, TelegramError } from "@/lib/telegram";
 import { segmentWhere } from "@/lib/segment";
 import { BROADCAST_QUEUE, redis, type BroadcastJob } from "@/lib/queue";
+import { aggregateStats, pruneEvents, sweepScheduled } from "@/worker/maintenance";
 
 const RATE_PER_SECOND = Number(process.env.BROADCAST_RATE ?? 25);
 const BATCH = 200;
@@ -250,8 +251,36 @@ worker.on("failed", (job, err) => {
 
 worker.on("ready", () => console.log("[worker] broadcast worker tayyor"));
 
+// ---------------------------------------------------------------- fon ishlari
+
+const SWEEP_MS = 60_000;
+const AGGREGATE_MS = 10 * 60_000;
+const PRUNE_MS = 6 * 60 * 60_000;
+
+async function safely(name: string, fn: () => Promise<unknown>) {
+  try {
+    const result = await fn();
+    if (typeof result === "number" && result > 0) {
+      console.log(`[maintenance] ${name}: ${result}`);
+    }
+  } catch (err) {
+    console.error(`[maintenance] ${name} xato:`, err);
+  }
+}
+
+// Ishga tushganda oxirgi 90 kunni to'ldiramiz — grafiklar bo'sh turmasin.
+void safely("boshlang'ich agregatsiya", () => aggregateStats(90));
+void safely("rejalashtirilganlarni tekshirish", sweepScheduled);
+
+const timers = [
+  setInterval(() => void safely("rejalashtirilganlarni tekshirish", sweepScheduled), SWEEP_MS),
+  setInterval(() => void safely("kunlik agregatsiya", () => aggregateStats(2)), AGGREGATE_MS),
+  setInterval(() => void safely("eski hodisalarni tozalash", pruneEvents), PRUNE_MS),
+];
+
 async function shutdown() {
   console.log("[worker] to'xtatilmoqda...");
+  timers.forEach(clearInterval);
   await worker.close();
   await prisma.$disconnect();
   process.exit(0);

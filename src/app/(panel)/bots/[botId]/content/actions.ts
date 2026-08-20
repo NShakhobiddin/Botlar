@@ -153,6 +153,7 @@ export async function deleteButton(botId: string, screenId: string, buttonId: st
   await requireBot(botId);
   await prisma.button.deleteMany({ where: { id: buttonId, screen: { botId } } });
   revalidatePath(`/bots/${botId}/content/${screenId}`);
+  redirect(`/bots/${botId}/content/${screenId}`);
 }
 
 /** Tugmani yuqoriga/pastga siljitadi. */
@@ -246,4 +247,104 @@ export async function deleteCommand(botId: string, command: string) {
   await requireBot(botId);
   await prisma.botCommand.deleteMany({ where: { botId, command } });
   revalidatePath(`/bots/${botId}/content`);
+}
+
+/** Ekranni tugmalari va tarjimalari bilan nusxalaydi. */
+export async function duplicateScreen(botId: string, screenId: string) {
+  const { user } = await requireBot(botId);
+  const source = await prisma.screen.findFirst({
+    where: { id: screenId, botId },
+    include: { translations: true, buttons: true },
+  });
+  if (!source) redirect(`/bots/${botId}/content`);
+
+  let key = `${source.key}_nusxa`;
+  for (let i = 2; await prisma.screen.findUnique({ where: { botId_key: { botId, key } } }); i++) {
+    key = `${source.key}_nusxa_${i}`;
+  }
+
+  const copy = await prisma.screen.create({
+    data: {
+      botId,
+      key,
+      name: `${source.name} (nusxa)`,
+      keyboardType: source.keyboardType,
+      resizeKeyboard: source.resizeKeyboard,
+      oneTimeKeyboard: source.oneTimeKeyboard,
+      awaitsInput: source.awaitsInput,
+      inputField: source.inputField,
+      inputNextKey: source.inputNextKey,
+      translations: {
+        create: source.translations.map((t) => ({
+          locale: t.locale,
+          text: t.text,
+          parseMode: t.parseMode,
+          mediaType: t.mediaType,
+          mediaUrl: t.mediaUrl,
+        })),
+      },
+      buttons: {
+        create: source.buttons.map((b) => ({
+          labels: b.labels as never,
+          action: b.action,
+          row: b.row,
+          col: b.col,
+          // O'ziga ishora qilgan tugmalar nusxaga emas, asl ekranga qoladi.
+          targetScreenId: b.targetScreenId,
+          url: b.url,
+          webAppId: b.webAppId,
+          commandKey: b.commandKey,
+        })),
+      },
+    },
+  });
+
+  await audit(user.id, "screen.duplicate", "Screen", copy.id, { from: source.key });
+  redirect(`/bots/${botId}/content/${copy.id}`);
+}
+
+export async function updateButton(
+  botId: string,
+  screenId: string,
+  buttonId: string,
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const { bot } = await requireBot(botId);
+  const button = await prisma.button.findFirst({
+    where: { id: buttonId, screen: { botId } },
+  });
+  if (!button) return { error: "Tugma topilmadi" };
+
+  const labels: Record<string, string> = {};
+  for (const locale of bot.locales) {
+    const v = String(formData.get(`label_${locale}`) ?? "").trim();
+    if (v) labels[locale] = v;
+  }
+  if (Object.keys(labels).length === 0) {
+    return { error: "Kamida bitta tilda tugma matnini kiriting" };
+  }
+
+  const action = String(formData.get("action") ?? "SCREEN");
+  const url = String(formData.get("url") ?? "").trim() || null;
+  const targetScreenId = String(formData.get("targetScreenId") ?? "") || null;
+  const webAppId = String(formData.get("webAppId") ?? "") || null;
+
+  if (action === "SCREEN" && !targetScreenId) return { error: "Qaysi ekranga o'tishini tanlang" };
+  if (action === "URL" && !url) return { error: "Havolani kiriting" };
+  if (action === "WEBAPP" && !webAppId) return { error: "Web App'ni tanlang" };
+
+  await prisma.button.update({
+    where: { id: buttonId },
+    data: {
+      labels: labels as never,
+      action: action as never,
+      url: action === "URL" ? url : null,
+      targetScreenId: action === "SCREEN" ? targetScreenId : null,
+      webAppId: action === "WEBAPP" ? webAppId : null,
+    },
+  });
+
+  revalidatePath(`/bots/${botId}/content/${screenId}`);
+  return { ok: "Tugma yangilandi" };
 }

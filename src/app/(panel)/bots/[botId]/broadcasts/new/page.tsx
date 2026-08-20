@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireBot } from "@/lib/auth";
+import { mediaUrl } from "@/lib/media";
 import { countAudience, createBroadcast } from "../actions";
 import { Composer } from "./composer";
 import { PageHeader } from "@/components/ui";
@@ -14,9 +15,15 @@ export default async function NewBroadcastPage({
   const { botId } = await params;
   const { bot } = await requireBot(botId);
 
-  const total = await prisma.botUser.count({
-    where: { botId, isBlocked: false, isBanned: false },
-  });
+  const [total, screens, assets] = await Promise.all([
+    prisma.botUser.count({ where: { botId, isBlocked: false, isBanned: false } }),
+    prisma.screen.findMany({
+      where: { botId },
+      select: { id: true, name: true },
+      orderBy: { key: "asc" },
+    }),
+    prisma.mediaAsset.findMany({ where: { botId }, orderBy: { createdAt: "desc" }, take: 100 }),
+  ]);
 
   return (
     <>
@@ -29,8 +36,14 @@ export default async function NewBroadcastPage({
         botId={botId}
         locales={bot.locales}
         defaultTotal={total}
-        createAction={createBroadcast.bind(null, botId)}
+        action={createBroadcast.bind(null, botId)}
         countAction={countAudience}
+        screens={screens}
+        mediaOptions={assets.map((a) => ({
+          url: mediaUrl(a.publicKey),
+          label: a.fileName,
+          kind: a.kind,
+        }))}
       />
     </>
   );

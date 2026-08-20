@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["bullmq", "ioredis", "bcryptjs"],
   experimental: {
-    serverActions: { bodySizeLimit: "5mb" },
+    serverActions: { bodySizeLimit: "25mb" },
   },
 };
 

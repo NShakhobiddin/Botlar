@@ -46,6 +46,7 @@ export default async function BotLayout({
             { href: `${base}/content`, label: "Kontent" },
             { href: `${base}/broadcasts`, label: "Xabar yuborish" },
             { href: `${base}/users`, label: "Obunachilar" },
+            { href: `${base}/media`, label: "Media" },
             { href: `${base}/webapps`, label: "Web App" },
             { href: `${base}/settings`, label: "Sozlamalar" },
           ]}

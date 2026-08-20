@@ -21,7 +21,18 @@ yotadi va panelda hech qachon to'liq ko'rsatilmaydi.
 Ekranlar (matn + media + tugmalar), inline va reply klaviaturalar, ko'p tillilik,
 `{{name}}` kabi o'rinbosarlar, `/buyruq` → ekran bog'lanishi, majburiy obuna
 kanallari, oddiy forma oqimi (foydalanuvchidan javob kutish). Tahrirlash paytida
-yonida Telegramda qanday ko'rinishi turadi.
+yonida Telegramda qanday ko'rinishi turadi. Ekrandan nusxa olish, tugmalarni
+alohida tahrirlash va qatorlarga joylash mumkin.
+
+**Kalit so'zlar**
+Buyruq ham, tugma ham bo'lmagan matnlarga javob berish: «narx» so'zi yozilsa
+narxlar ekranini ochish. Aynan teng / ichida bo'lsa / shu bilan boshlansa —
+uchta solishtirish usuli, tartib raqami va har biri necha marta ishlagani.
+
+**Media kutubxonasi**
+Rasm, video, GIF va fayllarni panelga yuklaysiz — ekranlar va xabarlarda
+ro'yxatdan tanlanadi, havolani qo'lda yozish shart emas. Fayllar Docker
+volume'da saqlanadi, Telegram ularni ochiq havola orqali oladi.
 
 **Xabar yuborish**
 Segment bo'yicha (til, faollik, qo'shilgan sana, Mini App ochganlar, telefon
@@ -30,10 +41,21 @@ Yuborishdan oldin o'zingizga sinov jo'natasiz. Yuborish alohida worker'da,
 sekundiga 25 xabar tezligida ketadi; to'xtatish va davom ettirish mumkin.
 Botni bloklaganlar avtomatik belgilanadi va keyingi yuborishlardan chiqadi.
 
+**Xabar yuborish (davomi)**
+Tayyor ekranni ommaviy yuborish mumkin — har bir obunachi o'z tilidagi matnni
+oladi. Qoralamani yuborishdan oldin tahrirlaysiz, yakunda to'liq yetkazish
+hisobotini CSV'ga chiqarasiz.
+
 **Statistika**
 Obunachilar o'sishi, DAU/MAU, bloklaganlar dinamikasi, eng ko'p ishlatilgan
-buyruqlar va ekranlar, tillar bo'yicha taqsimot. Har bot sahifasida oxirgi 24
-soatlik faollik chizig'i.
+buyruqlar va ekranlar, tillar bo'yicha taqsimot. 7 / 30 / 90 kunlik oraliqlar.
+Har bot sahifasida oxirgi 24 soatlik faollik chizig'i.
+
+**Obunachilar**
+Qidiruv va filtrlar, CSV eksport, har bir obunachi uchun alohida kartochka:
+profil, forma javoblari, harakatlar tarixi, Mini App sessiyalari, olgan
+ommaviy xabarlari. Panelning o'zidan shaxsiy xabar yuborish, holatini tozalash
+va ban qilish.
 
 **Web App (Mini App)**
 Mini App'ga bitta `<script>` qatorini qo'shasiz — ochilishlar, noyob
@@ -41,9 +63,16 @@ foydalanuvchilar, sessiya davomiyligi va o'zingiz yozgan hodisalar
 (`Botlar.track("checkout", { summa: 250000 })`) panelda ko'rinadi. Har bir yozuv
 Telegram `initData` imzosi bilan tekshiriladi.
 
-**Jamoa**
+**Jamoa va hisob**
 Uch daraja: egasi (hammasi), administrator (o'z botlari), ko'ruvchi (faqat
-kuzatish). Barcha muhim amallar tarixi yoziladi.
+kuzatish). Egasi parolni tiklay oladi, har kim o'z profili va parolini
+o'zgartiradi. Barcha muhim amallar tarixi yoziladi. Kirish sahifasi parol
+terib topishga qarshi cheklangan (10 daqiqada 8 urinish).
+
+**Fon ishlari**
+Worker har daqiqada rejalashtirilgan xabarlarni tekshiradi (Redis tozalansa
+ham yo'qolmaydi), har 10 daqiqada kunlik statistikani yig'adi va vaqti-vaqti
+bilan eski hodisalarni tozalaydi.
 
 ---
 
@@ -99,6 +128,10 @@ POSTGRES_PASSWORD=<parol>
 ADMIN_EMAIL=siz@example.uz
 ADMIN_PASSWORD=<kamida 10 belgi>
 ```
+
+Ixtiyoriy: `MEDIA_DIR` (yuklangan fayllar papkasi, Docker'da volume),
+`BROADCAST_RATE` (sekundiga xabarlar soni), `EVENT_RETENTION_DAYS`
+(hodisalar tarixi necha kun saqlansin).
 
 > **`ENCRYPTION_KEY` ni yo'qotmang.** Bot tokenlari shu kalit bilan shifrlangan —
 > kalitsiz ularni ochib bo'lmaydi va har bir botni qaytadan ulashga to'g'ri keladi.
@@ -202,7 +235,11 @@ docker compose exec app npx prisma migrate deploy
 **Zaxira nusxa** (kuniga bir marta cron'ga qo'ying)
 
 ```bash
+# Baza
 docker compose exec -T db pg_dump -U botlar botlar | gzip > backup-$(date +%F).sql.gz
+# Yuklangan fayllar
+docker run --rm -v botlar_media:/data -v "$PWD":/backup alpine \
+  tar czf /backup/media-$(date +%F).tar.gz -C /data .
 ```
 
 **Loglar**
@@ -224,6 +261,8 @@ docker compose logs -f worker    # xabar yuborish
 | Xabar sekin ketyapti | Bu normal: Telegram limiti sekundiga ~30 xabar. 100 000 obunachi ≈ 70 daqiqa. `BROADCAST_RATE` ni oshirish bloklanishga olib kelishi mumkin. |
 | Majburiy obuna ishlamayapti | Bot kanalda **administrator** bo'lishi shart, aks holda obunani tekshira olmaydi va foydalanuvchini to'smaydi. |
 | Mini App statistikasi bo'sh | Ilova Telegram ichida ochilyaptimi? Brauzerda ochilganda `initData` bo'lmaydi va yozuv qilinmaydi. |
+| Yuklangan rasm botda ko'rinmayapti | `APP_URL` tashqaridan ochiladimi? Telegram media'ni shu havola orqali o'zi yuklab oladi — localhost ishlamaydi. |
+| 90 kunlik grafik bo'sh | Uzoq oraliq worker yig'gan jadvaldan o'qiladi. `docker compose logs worker` da agregatsiya ishlaganini tekshiring. |
 
 ---
 
@@ -234,8 +273,12 @@ prisma/schema.prisma        Ma'lumotlar modeli
 src/app/(panel)/            Admin panel sahifalari
 src/app/api/tg/[botId]/     Telegram webhook
 src/app/api/track/          Mini App statistikasi
+src/app/api/media/[key]/    Yuklangan fayllarni tarqatish
+src/app/api/export/         Obunachilar va hisobotlar CSV
 src/lib/engine/             Bot mantiqi: update qayta ishlash va ekran chizish
 src/lib/telegram.ts         Telegram Bot API klienti
+src/lib/media.ts            Fayl yuklash va saqlash
 src/worker/index.ts         Broadcast worker (alohida jarayon)
+src/worker/maintenance.ts   Agregatsiya, rejalar va tozalash
 public/track.js             Mini App'ga qo'yiladigan snippet
 ```

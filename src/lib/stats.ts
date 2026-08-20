@@ -55,8 +55,41 @@ export type DayPoint = {
   blocked: number;
 };
 
-/** Kunlik o'sish grafigi uchun qator. */
+/**
+ * Kunlik o'sish grafigi uchun qator.
+ * Qisqa oraliq — jonli so'rov (har doim aniq).
+ * Uzoq oraliq — worker yig'gan DailyStat jadvalidan (tez).
+ */
 export async function dailySeries(botId: string, days = 30): Promise<DayPoint[]> {
+  if (days > 45) return dailySeriesFromRollup(botId, days);
+  return dailySeriesLive(botId, days);
+}
+
+async function dailySeriesFromRollup(botId: string, days: number): Promise<DayPoint[]> {
+  const from = new Date(Date.now() - days * DAY);
+  from.setUTCHours(0, 0, 0, 0);
+
+  const rows = await prisma.dailyStat.findMany({
+    where: { botId, date: { gte: from } },
+    orderBy: { date: "asc" },
+  });
+  const byDate = new Map(rows.map((r) => [r.date.toISOString().slice(0, 10), r]));
+
+  const out: DayPoint[] = [];
+  for (let i = 0; i <= days; i++) {
+    const key = new Date(from.getTime() + i * DAY).toISOString().slice(0, 10);
+    const row = byDate.get(key);
+    out.push({
+      date: key,
+      newUsers: row?.newUsers ?? 0,
+      activeUsers: row?.activeUsers ?? 0,
+      blocked: row?.blockedUsers ?? 0,
+    });
+  }
+  return out;
+}
+
+async function dailySeriesLive(botId: string, days: number): Promise<DayPoint[]> {
   const from = new Date(Date.now() - days * DAY);
   from.setHours(0, 0, 0, 0);
 

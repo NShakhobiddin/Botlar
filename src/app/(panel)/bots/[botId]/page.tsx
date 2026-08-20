@@ -1,3 +1,5 @@
+import Link from "next/link";
+import clsx from "clsx";
 import { requireBot } from "@/lib/auth";
 import {
   botOverview,
@@ -11,19 +13,26 @@ import { Card, CardHeader, Empty, Stat } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
+const RANGES = [7, 30, 90] as const;
+
 export default async function BotStatsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ botId: string }>;
+  searchParams: Promise<{ range?: string }>;
 }) {
   const { botId } = await params;
+  const { range } = await searchParams;
   await requireBot(botId);
+
+  const days = RANGES.includes(Number(range) as never) ? Number(range) : 30;
 
   const [stats, series, commands, screens, locales] = await Promise.all([
     botOverview(botId),
-    dailySeries(botId, 30),
-    topCommands(botId, 30),
-    topScreens(botId, 30),
+    dailySeries(botId, days),
+    topCommands(botId, days),
+    topScreens(botId, days),
     localeBreakdown(botId),
   ]);
 
@@ -46,16 +55,32 @@ export default async function BotStatsPage({
 
       <Card>
         <CardHeader
-          eyebrow="30 kun"
+          eyebrow={`${days} kun`}
           title="Obunachilar o'sishi"
           action={
-            <div className="flex items-center gap-4 text-xs text-muted">
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-amber-500" /> Yangi
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-signal" /> Faol
-              </span>
+            <div className="flex items-center gap-4">
+              <div className="hidden items-center gap-3 text-xs text-muted sm:flex">
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-amber-500" /> Yangi
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-signal" /> Faol
+                </span>
+              </div>
+              <div className="flex gap-1">
+                {RANGES.map((r) => (
+                  <Link
+                    key={r}
+                    href={`/bots/${botId}?range=${r}`}
+                    className={clsx(
+                      "rounded-[6px] px-2.5 py-1 font-mono text-xs transition-colors",
+                      r === days ? "bg-ink-700 text-text" : "text-faint hover:text-text"
+                    )}
+                  >
+                    {r}k
+                  </Link>
+                ))}
+              </div>
             </div>
           }
         />
@@ -66,7 +91,7 @@ export default async function BotStatsPage({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
-          <CardHeader eyebrow="30 kun" title="Eng ko'p ishlatilgan buyruqlar" />
+          <CardHeader eyebrow={`${days} kun`} title="Eng ko'p ishlatilgan buyruqlar" />
           {commands.length === 0 ? (
             <Empty title="Ma'lumot yig'ilmagan" hint="Bot ishga tushgach shu yerda ko'rinadi." />
           ) : (
@@ -77,7 +102,7 @@ export default async function BotStatsPage({
         </Card>
 
         <Card>
-          <CardHeader eyebrow="30 kun" title="Eng ko'p ochilgan ekranlar" />
+          <CardHeader eyebrow={`${days} kun`} title="Eng ko'p ochilgan ekranlar" />
           {screens.length === 0 ? (
             <Empty title="Ma'lumot yig'ilmagan" hint="Foydalanuvchilar tugmalarni bosgach to'ladi." />
           ) : (
@@ -88,7 +113,7 @@ export default async function BotStatsPage({
         </Card>
 
         <Card>
-          <CardHeader eyebrow="30 kun" title="Botni bloklaganlar" />
+          <CardHeader eyebrow={`${days} kun`} title="Botni bloklaganlar" />
           <div className="p-3">
             <BlockedChart data={series} />
           </div>

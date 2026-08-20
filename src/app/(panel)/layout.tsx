@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { NavLinks } from "@/components/nav";
+import { MobileNav, NavLinks } from "@/components/nav";
 import { logout } from "@/app/login/actions";
 
 export default async function PanelLayout({
@@ -43,11 +43,14 @@ export default async function PanelLayout({
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="flex items-center justify-between border-b border-ink-600 bg-ink-900 px-4 py-3 md:hidden">
+        <header className="flex items-center gap-3 border-b border-ink-600 bg-ink-900 px-4 py-3 md:hidden">
+          <MobileNav
+            bots={bots}
+            userName={user.name}
+            userEmail={user.email}
+            logoutAction={logout}
+          />
           <Link href="/" className="font-display font-bold">
-            Botlar
-          </Link>
-          <Link href="/bots" className="text-xs text-muted">
             Botlar
           </Link>
         </header>

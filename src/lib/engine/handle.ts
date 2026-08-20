@@ -136,9 +136,42 @@ async function handleMessage(bot: Bot, botUser: BotUser, update: TgUpdate) {
     return;
   }
 
-  // 4) Tushunarsiz xabar — fallback ekran yoki jim turish
+  // 4) Kalit so'z triggerlari
+  if (await matchTrigger(bot, botUser, text)) return;
+
+  // 5) Tushunarsiz xabar — fallback ekran yoki jim turish
   const fallback = await loadScreen(bot.id, "fallback");
   if (fallback) await renderScreen(bot, botUser, fallback);
+}
+
+/** Yozilgan matnni kalit so'z triggerlari bilan solishtiradi. */
+async function matchTrigger(bot: Bot, botUser: BotUser, text: string) {
+  if (!text) return false;
+
+  const triggers = await prisma.trigger.findMany({
+    where: { botId: bot.id, isActive: true },
+    orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
+  });
+
+  const hit = triggers.find((t) => {
+    const haystack = t.caseSensitive ? text : text.toLowerCase();
+    const needle = t.caseSensitive ? t.pattern : t.pattern.toLowerCase();
+    switch (t.matchType) {
+      case "EXACT":
+        return haystack === needle;
+      case "STARTS_WITH":
+        return haystack.startsWith(needle);
+      default:
+        return haystack.includes(needle);
+    }
+  });
+  if (!hit) return false;
+
+  await prisma.trigger
+    .update({ where: { id: hit.id }, data: { hitCount: { increment: 1 } } })
+    .catch(() => {});
+  await showScreenById(bot, botUser, hit.screenId);
+  return true;
 }
 
 /** Reply klaviaturada bosilgan tugmani matni bo'yicha topadi. */

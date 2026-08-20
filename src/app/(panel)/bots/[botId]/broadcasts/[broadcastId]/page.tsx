@@ -11,7 +11,7 @@ import {
 } from "../actions";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ActionForm, ConfirmButton, FormNotice, SubmitButton } from "@/components/forms";
-import { Badge, Card, CardHeader, Field, Stat } from "@/components/ui";
+import { Badge, Card, CardHeader, Field, LinkButton, Stat } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +71,14 @@ export default async function BroadcastPage({
           ← Barcha xabarlar
         </Link>
         <div className="flex items-center gap-2">
+          {canStart && (
+            <LinkButton
+              tone="ghost"
+              href={`/bots/${botId}/broadcasts/${broadcastId}/edit`}
+            >
+              Tahrirlash
+            </LinkButton>
+          )}
           {canStart && (
             <ConfirmButton
               action={start}

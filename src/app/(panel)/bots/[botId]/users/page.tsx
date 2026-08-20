@@ -75,15 +75,23 @@ export default async function UsersPage({
         eyebrow={`${total.toLocaleString("uz-UZ")} ta topildi`}
         title="Obunachilar"
         action={
-          <form className="flex gap-2">
-            <input type="hidden" name="filter" value={filter} />
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="Ism, @user, ID yoki raqam"
-              className="w-56 text-xs"
-            />
-          </form>
+          <div className="flex items-center gap-2">
+            <form className="flex gap-2">
+              <input type="hidden" name="filter" value={filter} />
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Ism, @user, ID yoki raqam"
+                className="w-56 text-xs"
+              />
+            </form>
+            <a
+              href={`/api/export?bot=${botId}&type=users`}
+              className="shrink-0 rounded-[6px] border border-ink-600 bg-ink-800 px-3 py-1.5 text-sm transition-colors hover:border-amber-500 hover:text-amber-400"
+            >
+              CSV
+            </a>
+          </div>
         }
       />
 
@@ -123,12 +131,14 @@ export default async function UsersPage({
               {users.map((u) => (
                 <tr key={u.id} className="transition-colors hover:bg-ink-800">
                   <Td>
-                    <div className="font-medium">
-                      {u.firstName} {u.lastName ?? ""}
-                    </div>
-                    <div className="font-mono text-xs text-faint">
-                      {u.username ? `@${u.username}` : u.phone ? u.phone : "—"}
-                    </div>
+                    <Link href={`/bots/${botId}/users/${u.id}`} className="block group/u">
+                      <div className="font-medium transition-colors group-hover/u:text-amber-400">
+                        {u.firstName} {u.lastName ?? ""}
+                      </div>
+                      <div className="font-mono text-xs text-faint">
+                        {u.username ? `@${u.username}` : u.phone ? u.phone : "—"}
+                      </div>
+                    </Link>
                   </Td>
                   <Td className="font-mono text-xs text-muted">{u.telegramId.toString()}</Td>
                   <Td className="font-mono text-xs uppercase text-muted">{u.locale}</Td>

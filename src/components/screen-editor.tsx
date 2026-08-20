@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import clsx from "clsx";
 import { Card, CardHeader, Field } from "@/components/ui";
+import { MediaField, type MediaOption } from "@/components/media-field";
 import { Notice, SubmitButton, type ActionState } from "@/components/forms";
 
 type Translation = {
@@ -32,6 +33,7 @@ export type ScreenEditorProps = {
   translations: Translation[];
   buttonRows: ButtonRow[];
   screenKeys: string[];
+  mediaOptions: MediaOption[];
 };
 
 const PLACEHOLDERS = [
@@ -48,6 +50,7 @@ export function ScreenEditor({
   translations,
   buttonRows,
   screenKeys,
+  mediaOptions,
 }: ScreenEditorProps) {
   const [state, formAction] = useActionState<ActionState, FormData>(action, {});
   const [active, setActive] = useState(defaultLocale);
@@ -136,23 +139,13 @@ export function ScreenEditor({
                         <option value="None">Oddiy matn</option>
                       </select>
                     </Field>
-                    <Field label="Media turi">
-                      <select name={`mediaType_${locale}`} defaultValue={tr?.mediaType ?? "NONE"}>
-                        <option value="NONE">Yo'q</option>
-                        <option value="PHOTO">Rasm</option>
-                        <option value="VIDEO">Video</option>
-                        <option value="ANIMATION">GIF</option>
-                        <option value="DOCUMENT">Fayl</option>
-                      </select>
-                    </Field>
-                    <Field label="Media havolasi">
-                      <input
-                        name={`mediaUrl_${locale}`}
-                        defaultValue={tr?.mediaUrl ?? ""}
-                        placeholder="https://… yoki file_id"
-                        className="font-mono text-xs"
-                      />
-                    </Field>
+                    <MediaField
+                      typeName={`mediaType_${locale}`}
+                      urlName={`mediaUrl_${locale}`}
+                      defaultType={tr?.mediaType ?? "NONE"}
+                      defaultUrl={tr?.mediaUrl ?? ""}
+                      options={mediaOptions}
+                    />
                   </div>
                 </div>
               );
