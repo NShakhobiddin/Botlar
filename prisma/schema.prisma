@@ -1,0 +1,385 @@
+// Botlar — Telegram botlarni boshqarish paneli
+// Bot mantiqi kodda emas, shu bazada saqlanadi: screen'lar, tugmalar, tarjimalar.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- panel users
+
+enum Role {
+  OWNER
+  ADMIN
+  VIEWER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(ADMIN)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  bots       Bot[]
+  auditLogs  AuditLog[]
+  broadcasts Broadcast[]
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+// ----------------------------------------------------------------------- bots
+
+model Bot {
+  id       String @id @default(cuid())
+  name     String
+  username String @unique
+  // Telegram token AES-256-GCM bilan shifrlanadi, ochiq holda hech qayerda saqlanmaydi.
+  tokenCipher   String
+  tokenIv       String
+  tokenTag      String
+  // Telegram X-Telegram-Bot-Api-Secret-Token header'ida qaytaradi.
+  webhookSecret String
+  telegramId    BigInt
+
+  isActive       Boolean  @default(true)
+  webhookSetAt   DateTime?
+  defaultLocale  String   @default("uz")
+  locales        String[] @default(["uz"])
+  // Majburiy obuna kanallari: [{ chatId, title, url }]
+  requiredChannels Json   @default("[]")
+  // Bot ishlamay turganda javob beriladigan matn
+  maintenanceMode Boolean @default(false)
+  maintenanceText String?
+
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  screens    Screen[]
+  commands   BotCommand[]
+  users      BotUser[]
+  broadcasts Broadcast[]
+  events     Event[]
+  webApps    WebApp[]
+  dailyStats DailyStat[]
+}
+
+model BotCommand {
+  id          String  @id @default(cuid())
+  botId       String
+  bot         Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  command     String // "start" — slashsiz
+  description String  @default("")
+  screenId    String?
+  screen      Screen? @relation(fields: [screenId], references: [id], onDelete: SetNull)
+  isVisible   Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  @@unique([botId, command])
+}
+
+// ------------------------------------------------------------------- kontent
+
+enum KeyboardType {
+  INLINE
+  REPLY
+  NONE
+}
+
+enum MediaType {
+  NONE
+  PHOTO
+  VIDEO
+  DOCUMENT
+  ANIMATION
+}
+
+/// Screen — botning bitta "ekrani": matn + media + tugmalar to'plami.
+model Screen {
+  id           String       @id @default(cuid())
+  botId        String
+  bot          Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  key          String // "start", "about" — kod ichida murojaat qilinadigan kalit
+  name         String
+  keyboardType KeyboardType @default(INLINE)
+  // REPLY klaviatura uchun
+  resizeKeyboard  Boolean @default(true)
+  oneTimeKeyboard Boolean @default(false)
+  // Bu ekranga kirganda foydalanuvchidan matn kutilsa (oddiy so'rov/forma)
+  awaitsInput   Boolean @default(false)
+  inputField    String? // javob qaysi nom bilan saqlansin
+  inputNextKey  String? // javobdan keyin ko'rsatiladigan screen key
+  isSystem      Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  translations ScreenTranslation[]
+  buttons      Button[]
+  commands     BotCommand[]
+  broadcasts   Broadcast[]
+  linkedFrom   Button[]            @relation("ButtonTarget")
+
+  @@unique([botId, key])
+  @@index([botId])
+}
+
+model ScreenTranslation {
+  id        String    @id @default(cuid())
+  screenId  String
+  screen    Screen    @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  locale    String
+  text      String    @default("")
+  parseMode String    @default("HTML") // HTML | Markdown | None
+  mediaType MediaType @default(NONE)
+  mediaUrl  String? // to'g'ridan-to'g'ri URL yoki Telegram file_id
+
+  @@unique([screenId, locale])
+}
+
+enum ButtonAction {
+  SCREEN // boshqa ekranga o'tish
+  URL // tashqi havola
+  WEBAPP // Telegram Mini App ochish
+  COMMAND // buyruqni bajarish
+  BACK // orqaga
+  SHARE_CONTACT
+  SHARE_LOCATION
+}
+
+model Button {
+  id       String       @id @default(cuid())
+  screenId String
+  screen   Screen       @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  // labels: { "uz": "Haqida", "ru": "О нас" }
+  labels   Json         @default("{}")
+  action   ButtonAction @default(SCREEN)
+  row      Int          @default(0)
+  col      Int          @default(0)
+
+  targetScreenId String?
+  targetScreen   Screen? @relation("ButtonTarget", fields: [targetScreenId], references: [id], onDelete: SetNull)
+  url            String?
+  webAppId       String?
+  webApp         WebApp? @relation(fields: [webAppId], references: [id], onDelete: SetNull)
+  commandKey     String?
+
+  @@index([screenId])
+}
+
+// -------------------------------------------------------------- bot userlari
+
+model BotUser {
+  id         String  @id @default(cuid())
+  botId      String
+  bot        Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  telegramId BigInt
+  username   String?
+  firstName  String  @default("")
+  lastName   String?
+  locale     String  @default("uz")
+  phone      String?
+
+  isBlocked Boolean @default(false) // botni bloklagan
+  isBanned  Boolean @default(false) // admin tomonidan bloklangan
+  isPremium Boolean @default(false)
+
+  // Joriy ekran va forma javoblari
+  currentScreenKey String?
+  awaitingField    String?
+  data             Json    @default("{}")
+
+  messageCount Int      @default(0)
+  lastSeenAt   DateTime @default(now())
+  blockedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  events          Event[]
+  deliveries      BroadcastDelivery[]
+  webAppSessions  WebAppSession[]
+
+  @@unique([botId, telegramId])
+  @@index([botId, createdAt])
+  @@index([botId, lastSeenAt])
+  @@index([botId, isBlocked])
+}
+
+// ------------------------------------------------------------------ broadcast
+
+enum BroadcastStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  DONE
+  CANCELLED
+  FAILED
+}
+
+model Broadcast {
+  id    String @id @default(cuid())
+  botId String
+  bot   Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name  String
+
+  // Tayyor ekranni yuborish yoki shu yerda yozilgan matnni
+  screenId String?
+  screen   Screen? @relation(fields: [screenId], references: [id], onDelete: SetNull)
+
+  text      String    @default("")
+  parseMode String    @default("HTML")
+  mediaType MediaType @default(NONE)
+  mediaUrl  String?
+  // [{ label, url }] — inline tugmalar
+  buttons   Json      @default("[]")
+  disableNotification Boolean @default(false)
+
+  // { locales: [], activeDays: 30|null, onlyActive: bool, openedWebApp: bool, joinedAfter, joinedBefore }
+  segment Json @default("{}")
+
+  status      BroadcastStatus @default(DRAFT)
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  totalCount   Int @default(0)
+  sentCount    Int @default(0)
+  failedCount  Int @default(0)
+  blockedCount Int @default(0)
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deliveries BroadcastDelivery[]
+
+  @@index([botId, status])
+  @@index([status, scheduledAt])
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  BLOCKED
+}
+
+model BroadcastDelivery {
+  id          String         @id @default(cuid())
+  broadcastId String
+  broadcast   Broadcast      @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  botUserId   String
+  botUser     BotUser        @relation(fields: [botUserId], references: [id], onDelete: Cascade)
+  status      DeliveryStatus @default(PENDING)
+  error       String?
+  messageId   Int?
+  sentAt      DateTime?
+
+  @@unique([broadcastId, botUserId])
+  @@index([broadcastId, status])
+}
+
+// ------------------------------------------------------------------ web app'lar
+
+model WebApp {
+  id        String  @id @default(cuid())
+  botId     String
+  bot       Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name      String
+  url       String
+  /// Mini App ichidagi JS snippet shu kalit bilan event yuboradi (public).
+  trackKey  String  @unique
+  isActive  Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  buttons  Button[]
+  sessions WebAppSession[]
+  events   Event[]
+}
+
+model WebAppSession {
+  id         String   @id @default(cuid())
+  webAppId   String
+  webApp     WebApp   @relation(fields: [webAppId], references: [id], onDelete: Cascade)
+  botUserId  String?
+  botUser    BotUser? @relation(fields: [botUserId], references: [id], onDelete: SetNull)
+  telegramId BigInt?
+  platform   String   @default("unknown")
+  startedAt  DateTime @default(now())
+  lastPingAt DateTime @default(now())
+  durationMs Int      @default(0)
+  eventCount Int      @default(0)
+
+  @@index([webAppId, startedAt])
+}
+
+// ------------------------------------------------------------------ analitika
+
+enum EventType {
+  START
+  COMMAND
+  MESSAGE
+  CALLBACK
+  SCREEN_VIEW
+  BLOCK
+  UNBLOCK
+  WEBAPP_OPEN
+  WEBAPP_EVENT
+  BROADCAST_SENT
+}
+
+model Event {
+  id        String    @id @default(cuid())
+  botId     String
+  bot       Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  botUserId String?
+  botUser   BotUser?  @relation(fields: [botUserId], references: [id], onDelete: SetNull)
+  webAppId  String?
+  webApp    WebApp?   @relation(fields: [webAppId], references: [id], onDelete: SetNull)
+  type      EventType
+  name      String    @default("")
+  payload   Json?
+  createdAt DateTime  @default(now())
+
+  @@index([botId, type, createdAt])
+  @@index([botId, createdAt])
+}
+
+/// Kunlik yig'ma statistika — grafiklar uchun tez o'qish.
+model DailyStat {
+  id            String   @id @default(cuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  date          DateTime @db.Date
+  newUsers      Int      @default(0)
+  activeUsers   Int      @default(0)
+  blockedUsers  Int      @default(0)
+  messages      Int      @default(0)
+  webAppOpens   Int      @default(0)
+
+  @@unique([botId, date])
+  @@index([botId, date])
+}

@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* Type: Space Grotesk (display) + IBM Plex Sans (body) + IBM Plex Mono (data).
+   CSS orqali yuklanadi — build paytida tarmoq talab qilmaydi. */
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+@theme {
+  /* Ground — sovuq siyoh-ko'k, neytral qora emas */
+  --color-ink-950: #0b0f17;
+  --color-ink-900: #10151f;
+  --color-ink-800: #161d2b;
+  --color-ink-700: #1e2739;
+  --color-ink-600: #2a3448;
+  --color-line: #26304260;
+
+  --color-text: #e6ebf4;
+  --color-muted: #8797b0;
+  --color-faint: #5c6b83;
+
+  /* Amber — yagona harakat rangi */
+  --color-amber-400: #f5b45c;
+  --color-amber-500: #f0a03c;
+  --color-amber-600: #d8842a;
+
+  --color-signal: #5ac8a8;
+  --color-rose: #ef6a72;
+  --color-violet: #8b7ef0;
+  --color-sky: #5aa9e6;
+
+  --font-display: "Space Grotesk", "Segoe UI", sans-serif;
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+* {
+  border-color: var(--color-ink-600);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Sarlavhalar va raqamlar dispecher registrida */
+h1, h2, h3, .display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bo'lim ustidagi kichik yorliq — "call sign" */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/* --- imzoviy element: signal chizig'i ---------------------------------- */
+.signal-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 34px;
+}
+.signal-tick {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--color-amber-500) 55%, transparent),
+    var(--color-amber-500)
+  );
+  transition: opacity 0.2s;
+}
+.signal-tick[data-empty="true"] {
+  background: var(--color-ink-700);
+}
+
+/* Jonli holat nuqtasi */
+.pulse {
+  position: relative;
+}
+.pulse::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0;
+  animation: pulse-ring 2.4s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.7); opacity: 0.7; }
+  70% { transform: scale(1.5); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse::after { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Formalar */
+input, textarea, select {
+  background: var(--color-ink-900);
+  border: 1px solid var(--color-ink-600);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  width: 100%;
+  outline: none;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--color-amber-500);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-amber-500) 18%, transparent);
+}
+input::placeholder, textarea::placeholder { color: var(--color-faint); }
+select {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238797b0' stroke-width='1.5'%3E%3Cpath d='M4 6.5l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 14px;
+}
+input[type="checkbox"] { width: auto; accent-color: var(--color-amber-500); }
+label { font-size: 0.8125rem; color: var(--color-muted); }
+
+:focus-visible {
+  outline: 2px solid var(--color-amber-500);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--color-ink-950); }
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: 999px;
+  border: 3px solid var(--color-ink-950);
+}
