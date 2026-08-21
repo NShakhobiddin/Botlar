@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireBot } from "@/lib/auth";
-import { describeAllowed, formatSize, mediaUrl } from "@/lib/media";
+import { describeAllowed, formatSize, mediaRef, publicMediaUrl } from "@/lib/media";
 import { deleteMedia, uploadMedia } from "./actions";
 import { UploadForm } from "./upload-form";
 import { CopyBox } from "@/components/copy";
@@ -58,7 +58,8 @@ export default async function MediaPage({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {assets.map((asset) => {
-            const url = mediaUrl(asset.publicKey);
+            const ref = mediaRef(asset.publicKey);
+            const url = publicMediaUrl(asset.publicKey);
             return (
               <Card key={asset.id} className="overflow-hidden">
                 <div className="flex h-40 items-center justify-center border-b border-ink-600 bg-ink-950">
@@ -88,7 +89,18 @@ export default async function MediaPage({
                     <Badge>{KIND_LABEL[asset.kind]}</Badge>
                   </div>
 
-                  <CopyBox text={url} />
+                  <div className="space-y-1.5">
+                    <div className="eyebrow">Kontentga qo&apos;yish uchun</div>
+                    <CopyBox text={ref} />
+                    {url && (
+                      <details className="text-xs text-faint">
+                        <summary className="cursor-pointer">Ochiq havola</summary>
+                        <div className="mt-1.5">
+                          <CopyBox text={url} />
+                        </div>
+                      </details>
+                    )}
+                  </div>
 
                   <ConfirmButton
                     action={deleteMedia.bind(null, botId, asset.id)}

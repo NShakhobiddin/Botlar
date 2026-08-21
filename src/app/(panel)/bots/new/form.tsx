@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createBot, type ActionState } from "../actions";
 import { Button, Card, Field } from "@/components/ui";
@@ -14,8 +14,9 @@ function Submit() {
   );
 }
 
-export function NewBotForm() {
+export function NewBotForm({ canWebhook }: { canWebhook: boolean }) {
   const [state, action] = useActionState<ActionState, FormData>(createBot, {});
+  const [mode, setMode] = useState(canWebhook ? "WEBHOOK" : "POLLING");
 
   return (
     <Card className="p-5">
@@ -36,6 +37,30 @@ export function NewBotForm() {
         <Field label="Nomi" hint="Bo'sh qoldirilsa Telegram'dagi nomi olinadi.">
           <input name="name" placeholder="Do'kon boti" />
         </Field>
+
+        <Field
+          label="Telegram bilan ulanish"
+          hint={
+            mode === "POLLING"
+              ? "Bot Telegram'dan o'zi so'raydi. Domen, HTTPS va statik IP kerak emas — panel uy kompyuterida ham ishlaydi."
+              : "Telegram sizning saytingizga o'zi murojaat qiladi. Tezroq, lekin ochiq HTTPS domen shart."
+          }
+        >
+          <select name="mode" value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="WEBHOOK" disabled={!canWebhook}>
+              Webhook {canWebhook ? "" : "— APP_URL o'rnatilmagan"}
+            </option>
+            <option value="POLLING">Polling — tashqi serversiz</option>
+          </select>
+        </Field>
+
+        {!canWebhook && (
+          <p className="rounded-[6px] border border-ink-600 bg-ink-800 px-3 py-2 text-xs text-muted">
+            <span className="font-mono text-amber-400">APP_URL</span> ochiq HTTPS manzilga
+            o&apos;rnatilmagani uchun polling tanlandi. Bot shu kompyuter yoqiq turganda
+            ishlaydi.
+          </p>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Asosiy til">

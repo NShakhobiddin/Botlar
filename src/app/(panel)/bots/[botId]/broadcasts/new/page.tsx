@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireBot } from "@/lib/auth";
-import { mediaUrl } from "@/lib/media";
+import { mediaRef } from "@/lib/media";
 import { countAudience, createBroadcast } from "../actions";
 import { Composer } from "./composer";
 import { PageHeader } from "@/components/ui";
@@ -40,7 +40,7 @@ export default async function NewBroadcastPage({
         countAction={countAudience}
         screens={screens}
         mediaOptions={assets.map((a) => ({
-          url: mediaUrl(a.publicKey),
+          url: mediaRef(a.publicKey),
           label: a.fileName,
           kind: a.kind,
         }))}

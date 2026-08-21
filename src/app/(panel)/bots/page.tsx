@@ -71,6 +71,8 @@ export default async function BotsPage() {
                       <Badge>O'chirilgan</Badge>
                     ) : bot.maintenanceMode ? (
                       <Badge tone="warn">Texnik ish</Badge>
+                    ) : bot.mode === "POLLING" ? (
+                      <Badge tone="live">Polling</Badge>
                     ) : bot.webhookSetAt ? (
                       <Badge tone="live">Ishlayapti</Badge>
                     ) : (

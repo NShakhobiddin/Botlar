@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { audit, requireBot } from "@/lib/auth";
 import { botToken } from "@/lib/bots";
 import { send, TelegramError } from "@/lib/telegram";
+import { cacheFileId, resolveMedia } from "@/lib/media-send";
 import { segmentWhere, type Segment } from "@/lib/segment";
 import { cancelBroadcastJob, enqueueBroadcast } from "@/lib/queue";
 import type { ActionState } from "@/components/forms";
@@ -234,17 +235,21 @@ export async function sendTest(
     ? (broadcast.buttons as { label: string; url: string }[])
     : [];
 
+  const media = await resolveMedia(botId, broadcast.mediaUrl);
+
   try {
-    await send(botToken(bot), {
+    const sent = await send(botToken(bot), {
       chatId: Number(raw),
       text: broadcast.text,
       parseMode: broadcast.parseMode,
       mediaType: broadcast.mediaType,
-      mediaUrl: broadcast.mediaUrl,
+      mediaUrl: media.mediaUrl,
+      mediaFile: media.mediaFile,
       replyMarkup: buttons.length
         ? { inline_keyboard: buttons.map((b) => [{ text: b.label, url: b.url }]) }
         : undefined,
     });
+    await cacheFileId(media.assetId, sent.fileId);
     return { ok: "Sinov xabari yuborildi" };
   } catch (err) {
     if (err instanceof TelegramError && err.isUserGone) {

@@ -8,10 +8,13 @@ export function SettingsForm({
   action,
   bot,
   channels,
+  canWebhook,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
+  canWebhook: boolean;
   bot: {
     name: string;
+    mode: string;
     isActive: boolean;
     maintenanceMode: boolean;
     maintenanceText: string | null;
@@ -21,6 +24,7 @@ export function SettingsForm({
   channels: { chatId: string; title: string; url: string }[];
 }) {
   const [maintenance, setMaintenance] = useState(bot.maintenanceMode);
+  const [mode, setMode] = useState(bot.mode);
 
   return (
     <ActionForm action={action}>
@@ -47,6 +51,22 @@ export function SettingsForm({
                 />
               </Field>
             </div>
+
+            <Field
+              label="Telegram bilan ulanish"
+              hint={
+                mode === "POLLING"
+                  ? "Bot Telegram'dan o'zi so'raydi — domen va HTTPS kerak emas."
+                  : "Telegram saytingizga o'zi murojaat qiladi — ochiq HTTPS domen shart."
+              }
+            >
+              <select name="mode" value={mode} onChange={(e) => setMode(e.target.value)}>
+                <option value="WEBHOOK" disabled={!canWebhook}>
+                  Webhook {canWebhook ? "" : "— APP_URL o'rnatilmagan"}
+                </option>
+                <option value="POLLING">Polling — tashqi serversiz</option>
+              </select>
+            </Field>
 
             <div className="flex flex-wrap gap-5 text-sm">
               <label className="flex items-center gap-2">

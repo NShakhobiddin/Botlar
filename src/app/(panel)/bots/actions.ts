@@ -52,6 +52,10 @@ export async function createBot(
 
   const sealed = seal(token);
   const secret = randomToken(24);
+  // Ochiq HTTPS manzil bo'lmasa webhook baribir ishlamaydi — polling'ga tushamiz.
+  const requested = String(formData.get("mode") ?? "");
+  const canWebhook = /^https:\/\//.test(process.env.APP_URL ?? "");
+  const mode = requested === "POLLING" || !canWebhook ? "POLLING" : "WEBHOOK";
   const defaultLocale = String(formData.get("defaultLocale") ?? "uz");
   const locales = String(formData.get("locales") ?? "uz")
     .split(",")
@@ -68,6 +72,7 @@ export async function createBot(
       tokenTag: sealed.tag,
       webhookSecret: secret,
       ownerId: user.id,
+      mode,
       defaultLocale,
       locales: locales.length ? locales : [defaultLocale],
     },
@@ -76,15 +81,20 @@ export async function createBot(
   // Har bir yangi bot ishlaydigan holatda boshlansin — /start ekrani tayyor turadi.
   await seedStarterContent(bot.id, defaultLocale, me.first_name);
 
-  try {
-    await setWebhook(token, webhookUrl(bot.id), secret);
-    await prisma.bot.update({
-      where: { id: bot.id },
-      data: { webhookSetAt: new Date() },
-    });
-  } catch (err) {
-    // Bot yaratildi, lekin webhook o'rnatilmadi — sozlamalar sahifasidan qayta urinish mumkin.
-    console.error("[createBot] webhook", err);
+  if (mode === "WEBHOOK") {
+    try {
+      await setWebhook(token, webhookUrl(bot.id), secret);
+      await prisma.bot.update({
+        where: { id: bot.id },
+        data: { webhookSetAt: new Date() },
+      });
+    } catch (err) {
+      // Bot yaratildi, lekin webhook o'rnatilmadi — sozlamalar sahifasidan qayta urinish mumkin.
+      console.error("[createBot] webhook", err);
+    }
+  } else {
+    // Polling rejimida webhook bo'lmasligi kerak, aks holda Telegram 409 qaytaradi.
+    await deleteWebhook(token).catch(() => {});
   }
 
   await audit(user.id, "bot.create", "Bot", bot.id, {
@@ -163,6 +173,9 @@ async function seedStarterContent(botId: string, locale: string, botName: string
 
 export async function refreshWebhook(botId: string): Promise<ActionState> {
   const { bot, user } = await requireBot(botId);
+  if (bot.mode === "POLLING") {
+    return { error: "Bot polling rejimida — webhook kerak emas" };
+  }
   try {
     const token = botToken(bot);
     await setWebhook(token, webhookUrl(bot.id), bot.webhookSecret);
@@ -182,6 +195,7 @@ export async function refreshWebhook(botId: string): Promise<ActionState> {
 
 export async function webhookStatus(botId: string) {
   const { bot } = await requireBot(botId);
+  if (bot.mode === "POLLING") return null;
   try {
     return await getWebhookInfo(botToken(bot));
   } catch {
@@ -238,9 +252,37 @@ export async function updateBotSettings(
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // Forma rejimni yubormagan bo'lsa (masalan eski sahifadan) borini o'zgartirmaymiz.
+  const submittedMode = formData.get("mode");
+  const mode =
+    submittedMode === "POLLING" || submittedMode === "WEBHOOK" ? submittedMode : bot.mode;
+  let modeNote = "";
+  if (mode !== bot.mode) {
+    const token = botToken(bot);
+    if (mode === "POLLING") {
+      await deleteWebhook(token).catch(() => {});
+      await prisma.bot.update({ where: { id: bot.id }, data: { webhookSetAt: null } });
+      modeNote = " Polling yoqildi — worker bir daqiqa ichida botni tinglay boshlaydi.";
+    } else {
+      try {
+        await setWebhook(token, webhookUrl(bot.id), bot.webhookSecret);
+        await prisma.bot.update({
+          where: { id: bot.id },
+          data: { webhookSetAt: new Date() },
+        });
+        modeNote = " Webhook o'rnatildi.";
+      } catch (err) {
+        return {
+          error: `Webhook o'rnatilmadi: ${err instanceof Error ? err.message : "xato"}. APP_URL ochiq HTTPS manzil ekaniga ishonch hosil qiling.`,
+        };
+      }
+    }
+  }
+
   await prisma.bot.update({
     where: { id: bot.id },
     data: {
+      mode,
       name: String(formData.get("name") ?? bot.name).trim() || bot.name,
       isActive: formData.get("isActive") === "on",
       maintenanceMode: formData.get("maintenanceMode") === "on",
@@ -251,9 +293,9 @@ export async function updateBotSettings(
     },
   });
 
-  await audit(user.id, "bot.update", "Bot", bot.id);
+  await audit(user.id, "bot.update", "Bot", bot.id, { mode });
   revalidatePath(`/bots/${botId}`, "layout");
-  return { ok: "Sozlamalar saqlandi" };
+  return { ok: `Sozlamalar saqlandi.${modeNote}` };
 }
 
 export async function deleteBot(botId: string) {

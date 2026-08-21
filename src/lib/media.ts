@@ -1,4 +1,4 @@
-import "server-only";
+// Faqat server tomonida ishlatiladi (Next server komponentlari va worker jarayoni).
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomToken } from "@/lib/crypto";
@@ -71,9 +71,30 @@ export function isSafeKey(key: string): boolean {
   return /^[A-Za-z0-9_-]{10,64}\.[a-z0-9]{2,5}$/.test(key);
 }
 
-export function mediaUrl(publicKey: string): string {
-  const base = process.env.APP_URL?.replace(/\/$/, "") ?? "";
-  return `${base}/api/media/${publicKey}`;
+/**
+ * Kontent ichida saqlanadigan ko'chma ishora.
+ * Ochiq havolaga bog'lanmagani uchun domen o'zgarsa ham ishlayveradi
+ * va polling rejimida (domensiz) ham to'g'ri hal qilinadi.
+ */
+export function mediaRef(publicKey: string): string {
+  return `media:${publicKey}`;
+}
+
+/** Saqlangan qiymatdan fayl kalitini ajratadi. Boshqa qiymatlar uchun null. */
+export function parseMediaRef(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (value.startsWith("media:")) {
+    const key = value.slice(6);
+    return isSafeKey(key) ? key : null;
+  }
+  const match = value.match(/\/api\/media\/([A-Za-z0-9_-]+\.[a-z0-9]+)$/);
+  return match && isSafeKey(match[1]) ? match[1] : null;
+}
+
+/** Ochiq havola — faqat APP_URL o'rnatilgan bo'lsa. */
+export function publicMediaUrl(publicKey: string): string | null {
+  const base = process.env.APP_URL?.replace(/\/$/, "");
+  return base ? `${base}/api/media/${publicKey}` : null;
 }
 
 export function formatSize(bytes: number): string {

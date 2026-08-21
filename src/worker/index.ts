@@ -13,9 +13,11 @@ try {
 import { prisma } from "@/lib/db";
 import { botToken } from "@/lib/bots";
 import { send, TelegramError } from "@/lib/telegram";
+import { cacheFileId, resolveMedia } from "@/lib/media-send";
 import { segmentWhere } from "@/lib/segment";
 import { BROADCAST_QUEUE, redis, type BroadcastJob } from "@/lib/queue";
 import { aggregateStats, pruneEvents, sweepScheduled } from "@/worker/maintenance";
+import { startPoller } from "@/worker/poller";
 
 const RATE_PER_SECOND = Number(process.env.BROADCAST_RATE ?? 25);
 const BATCH = 200;
@@ -76,6 +78,13 @@ async function processBroadcast(job: Job<BroadcastJob>) {
   );
   const contentFor = (locale: string): Content =>
     byLocale.get(locale) ?? byLocale.get(broadcast.bot.defaultLocale) ?? inline;
+
+  // Har bir variant uchun media bir marta hal qilinadi.
+  for (const content of [inline, ...byLocale.values()]) {
+    if (content.mediaType !== "NONE" && content.mediaUrl) {
+      content.resolved = await resolveMedia(broadcast.botId, content.mediaUrl);
+    }
+  }
 
   let cursor: string | undefined;
   let stopped = false;
@@ -168,6 +177,8 @@ type Content = {
   parseMode: string;
   mediaType: "NONE" | "PHOTO" | "VIDEO" | "DOCUMENT" | "ANIMATION";
   mediaUrl: string | null;
+  /** Yuborishdan oldin bir marta hal qilinadi — har obunachi uchun emas. */
+  resolved?: import("@/lib/media-send").ResolvedMedia;
 };
 
 async function sendOne(
@@ -278,9 +289,13 @@ const timers = [
   setInterval(() => void safely("eski hodisalarni tozalash", pruneEvents), PRUNE_MS),
 ];
 
+// Polling rejimidagi botlar shu jarayonda tinglanadi.
+const stopPoller = process.env.DISABLE_POLLER === "true" ? () => {} : startPoller();
+
 async function shutdown() {
   console.log("[worker] to'xtatilmoqda...");
   timers.forEach(clearInterval);
+  stopPoller();
   await worker.close();
   await prisma.$disconnect();
   process.exit(0);

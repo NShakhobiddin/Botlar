@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireBot } from "@/lib/auth";
-import { mediaUrl } from "@/lib/media";
+import { mediaRef } from "@/lib/media";
 import type { Segment } from "@/lib/segment";
 import { countAudience, updateBroadcast } from "../../actions";
 import { Composer } from "../../new/composer";
@@ -56,7 +56,7 @@ export default async function EditBroadcastPage({
         countAction={countAudience}
         screens={screens}
         mediaOptions={assets.map((a) => ({
-          url: mediaUrl(a.publicKey),
+          url: mediaRef(a.publicKey),
           label: a.fileName,
           kind: a.kind,
         }))}

@@ -108,7 +108,11 @@ export default async function OverviewPage() {
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {bot.maintenanceMode && <Badge tone="warn">Texnik ish</Badge>}
                   {running > 0 && <Badge tone="info">{running} ta yuborish</Badge>}
-                  {!bot.webhookSetAt && <Badge tone="danger">Webhook yo'q</Badge>}
+                  {bot.mode === "POLLING" ? (
+                    <Badge tone="live">Polling</Badge>
+                  ) : (
+                    !bot.webhookSetAt && <Badge tone="danger">Webhook yo'q</Badge>
+                  )}
                 </div>
               </div>
 

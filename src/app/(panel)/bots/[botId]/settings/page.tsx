@@ -30,8 +30,31 @@ export default async function BotSettingsPage({
     await refreshWebhook(botId);
   }
 
+  const polling = bot.mode === "POLLING";
+
   return (
     <div className="space-y-5">
+      {polling ? (
+        <Card>
+          <CardHeader eyebrow="Telegram ulanishi" title="Polling" />
+          <div className="space-y-3 p-5">
+            <div className="flex items-center gap-2">
+              <Badge tone="live">Tashqi serversiz</Badge>
+              <span className="text-xs text-muted">
+                Bot Telegram&apos;dan yangiliklarni o&apos;zi so&apos;raydi
+              </span>
+            </div>
+            <p className="max-w-2xl text-xs text-muted">
+              Domen, HTTPS sertifikat va statik IP kerak emas — panelni uy kompyuterida
+              yoki ichki tarmoqda ishlatsangiz ham bot javob beradi. Buning uchun{" "}
+              <span className="font-mono text-amber-400">worker</span> jarayoni ishlab
+              turishi kifoya. Kompyuter o&apos;chsa bot ham javob bermay qoladi va
+              yoqilganda o&apos;tkazib yuborilgan xabarlarni Telegram qaytadan beradi
+              (24 soat saqlanadi).
+            </p>
+          </div>
+        </Card>
+      ) : (
       <Card>
         <CardHeader
           eyebrow="Telegram ulanishi"
@@ -78,11 +101,14 @@ export default async function BotSettingsPage({
           )}
         </div>
       </Card>
+      )}
 
       <SettingsForm
         action={updateBotSettings.bind(null, botId)}
+        canWebhook={/^https:\/\//.test(process.env.APP_URL ?? "")}
         bot={{
           name: bot.name,
+          mode: bot.mode,
           isActive: bot.isActive,
           maintenanceMode: bot.maintenanceMode,
           maintenanceText: bot.maintenanceText,

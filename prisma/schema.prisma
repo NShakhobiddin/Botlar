@@ -50,10 +50,18 @@ model AuditLog {
 
 // ----------------------------------------------------------------------- bots
 
+enum BotMode {
+  /// Telegram bizga o'zi murojaat qiladi — ochiq HTTPS domen kerak.
+  WEBHOOK
+  /// Bot Telegram'dan o'zi so'raydi — domen, IP va sertifikat kerak emas.
+  POLLING
+}
+
 model Bot {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   name     String
-  username String @unique
+  username String  @unique
+  mode     BotMode @default(WEBHOOK)
   // Telegram token AES-256-GCM bilan shifrlanadi, ochiq holda hech qayerda saqlanmaydi.
   tokenCipher   String
   tokenIv       String
@@ -228,6 +236,9 @@ model MediaAsset {
   kind     MediaType
   /// Ochiq havoladagi tasodifiy kalit — fayl nomi taxmin qilinmasin.
   publicKey String   @unique
+  /// Telegram'ga birinchi yuborilgandan keyin qaytgan file_id.
+  /// Keyingi yuborishlarda fayl qaytadan yuklanmaydi.
+  telegramFileId String?
   width     Int?
   height    Int?
   createdAt DateTime @default(now())

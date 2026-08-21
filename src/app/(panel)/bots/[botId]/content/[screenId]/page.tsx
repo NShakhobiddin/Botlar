@@ -13,7 +13,7 @@ import {
   updateScreen,
 } from "../actions";
 import { ButtonFields } from "../button-fields";
-import { mediaUrl } from "@/lib/media";
+import { mediaRef } from "@/lib/media";
 import { ScreenEditor } from "@/components/screen-editor";
 import { ActionForm, ConfirmButton, FormNotice, InlineAction, SubmitButton } from "@/components/forms";
 import { Badge, Card, CardHeader, Empty, Field } from "@/components/ui";
@@ -68,7 +68,7 @@ export default async function ScreenEditorPage({
   ]);
 
   const mediaOptions = assets.map((a) => ({
-    url: mediaUrl(a.publicKey),
+    url: mediaRef(a.publicKey),
     label: a.fileName,
     kind: a.kind,
   }));

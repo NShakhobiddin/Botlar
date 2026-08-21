@@ -1,6 +1,7 @@
-import "server-only";
+// Faqat server tomonida ishlatiladi (Next server komponentlari va worker jarayoni).
 import { prisma } from "@/lib/db";
 import { botToken, parseChannels } from "@/lib/bots";
+import { cacheFileId, resolveMedia } from "@/lib/media-send";
 import {
   answerCallbackQuery,
   getChatMember,
@@ -278,14 +279,17 @@ export async function renderScreen(bot: Bot, botUser: BotUser, screen: FullScree
     ...(botUser.data as Record<string, unknown>),
   };
 
-  await send(token, {
+  const media = await resolveMedia(bot.id, tr.mediaUrl);
+  const sent = await send(token, {
     chatId: Number(botUser.telegramId),
     text: interpolate(tr.text, vars),
     parseMode: tr.parseMode,
     mediaType: tr.mediaType,
-    mediaUrl: tr.mediaUrl,
+    mediaUrl: media.mediaUrl,
+    mediaFile: media.mediaFile,
     replyMarkup: buildKeyboard(screen, locale, bot.defaultLocale),
   });
+  await cacheFileId(media.assetId, sent.fileId);
 
   await prisma.botUser.update({
     where: { id: botUser.id },

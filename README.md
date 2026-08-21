@@ -88,20 +88,102 @@ bilan eski hodisalarni tozalaydi.
 
 ---
 
+## Ikki xil ishlatish yo'li
+
+Botni Telegram bilan ulashning ikki usuli bor. Ikkalasi ham panelning o'zidan
+tanlanadi va istalgan vaqtda almashtiriladi.
+
+| | **Polling** | **Webhook** |
+|---|---|---|
+| Domen kerakmi | Yo'q | Ha, HTTPS bilan |
+| Statik IP / sertifikat | Kerak emas | Kerak |
+| Qayerda ishlaydi | Uy kompyuteri, ofis, ichki tarmoq | VPS, ochiq server |
+| Qanday ishlaydi | Bot Telegram'dan o'zi so'raydi | Telegram sizga o'zi yuboradi |
+| 24/7 ishlashi | Kompyuter yoqiq turishi kerak | Ha |
+| Javob tezligi | ~1 soniya | Bir zumda |
+| Mini App statistikasi | Ishlamaydi (HTTPS talab qiladi) | Ishlaydi |
+
+**Polling** — tashqi serversiz boshlash uchun. Domen sotib olmaysiz, sertifikat
+sozlamaysiz, port ochmaysiz. Panel `http://localhost:3000` da turadi, tashqaridan
+hech kim unga ulana olmaydi. Kompyuter o'chsa bot ham javob bermay qoladi;
+yoqilganda Telegram o'tkazib yuborilgan xabarlarni qaytadan beradi (24 soat
+saqlanadi).
+
+**Webhook** — 24/7 ishlashi va Mini App statistikasi kerak bo'lganda.
+
+Media ikkala rejimda ham ishlaydi: yuklangan fayl Telegram'ga to'g'ridan-to'g'ri
+jo'natiladi, ochiq havola kerak emas. Birinchi yuborishdan keyin Telegram
+qaytargan `file_id` saqlanadi — mingta obunachiga fayl bir marta yuklanadi.
+
+---
+
+## Tashqi serversiz o'rnatish (polling)
+
+Kerak bo'ladigan narsa: Docker o'rnatilgan kompyuter. Domen ham, VPS ham,
+karta ham kerak emas.
+
+```bash
+git clone <repo-url> botlar && cd botlar
+cp .env.example .env
+```
+
+`.env` da **`APP_URL` ni bo'sh qoldiring** va qolganini to'ldiring:
+
+```env
+APP_URL=
+ENCRYPTION_KEY=<openssl rand -hex 32>
+SESSION_SECRET=<openssl rand -hex 32>
+POSTGRES_PASSWORD=<parol>
+ADMIN_EMAIL=siz@example.uz
+ADMIN_PASSWORD=<kamida 10 belgi>
+```
+
+```bash
+docker compose up -d --build
+docker compose exec app npx prisma migrate deploy
+docker compose exec app npx tsx prisma/seed.ts
+```
+
+`http://localhost:3000` ni oching, kiring va **Bot qo'shish** → tokenni qo'ying.
+`APP_URL` bo'sh bo'lgani uchun ulanish rejimi avtomatik **Polling** bo'lib
+tanlanadi. Bir daqiqa ichida `worker` botni tinglay boshlaydi — Telegramda
+`/start` yozib ko'ring.
+
+Botning ishlayotganini tekshirish:
+
+```bash
+docker compose logs -f worker | grep poller
+# [poller] @sizning_bot tinglanmoqda
+```
+
+Keyinchalik VPS'ga ko'chsangiz: `.env` ga `APP_URL` ni yozib, panel
+sozlamalaridan rejimni **Webhook** ga o'zgartirasiz — boshqa hech narsa
+o'zgarmaydi.
+
+---
+
 ## Sizdan nima kerak
 
-1. **VPS** — 2 vCPU / 4 GB RAM yetarli (Hetzner, Contabo, DigitalOcean).
-2. **Domen** va unga yo'naltirilgan A-yozuv, masalan `panel.example.uz`.
-3. **HTTPS sertifikat** — Telegram webhook faqat HTTPS bilan ishlaydi
-   (Let's Encrypt bepul).
-4. **Bot tokenlari** — @BotFather → `/mybots` → *API Token*.
+**Polling rejimi uchun:**
+
+1. **Docker** o'rnatilgan kompyuter (Windows, macOS yoki Linux).
+2. **Bot tokenlari** — @BotFather → `/mybots` → *API Token*.
    Tokenni panelning o'ziga kiritasiz, kodga yozmaysiz.
-5. Mini App statistikasi kerak bo'lsa — Mini App kodiga bitta qator qo'sha olish
+
+Boshqa hech narsa kerak emas.
+
+**Webhook rejimi uchun qo'shimcha:**
+
+3. **VPS** — 2 vCPU / 4 GB RAM yetarli (Hetzner, Contabo, DigitalOcean).
+4. **Domen** va unga yo'naltirilgan A-yozuv, masalan `panel.example.uz`.
+5. **HTTPS sertifikat** — Telegram webhook faqat HTTPS bilan ishlaydi
+   (Let's Encrypt bepul).
+6. Mini App statistikasi kerak bo'lsa — Mini App kodiga bitta qator qo'sha olish
    imkoniyati.
 
 ---
 
-## O'rnatish (VPS + Docker)
+## O'rnatish (VPS + Docker, webhook rejimi)
 
 ### 1. Kodni olish
 
@@ -255,7 +337,9 @@ docker compose logs -f worker    # xabar yuborish
 
 | Belgi | Sababi va yechimi |
 |---|---|
-| Bot javob bermayapti | Sozlamalar → Webhook holatini tekshiring. «Ulanmagan» bo'lsa **Qayta o'rnatish**. `APP_URL` HTTPS ekaniga va tashqaridan ochilishiga ishonch hosil qiling. |
+| Bot javob bermayapti (webhook) | Sozlamalar → Webhook holatini tekshiring. «Ulanmagan» bo'lsa **Qayta o'rnatish**. `APP_URL` HTTPS ekaniga va tashqaridan ochilishiga ishonch hosil qiling. |
+| Bot javob bermayapti (polling) | `docker compose logs -f worker` da `[poller] @bot tinglanmoqda` qatori bormi? Yo'q bo'lsa bot sozlamalarida rejim **Polling** ekanini va bot yoqilganini tekshiring. |
+| Loglarda `409 Conflict` | Bir bot ustida ikkita nusxa ishlayapti yoki webhook o'chirilmagan. Panel buni o'zi tuzatadi; takrorlansa `worker` ni qayta ishga tushiring. |
 | «Webhook yo'q» belgisi | `APP_URL` noto'g'ri yoki sertifikat yaroqsiz. Telegram o'z-o'zidan imzolangan sertifikatni qabul qilmaydi. |
 | Xabar yuborilmayapti | `docker compose logs worker` ga qarang. Worker konteyneri ishlayotganini va Redis'ga ulanishini tekshiring. |
 | Xabar sekin ketyapti | Bu normal: Telegram limiti sekundiga ~30 xabar. 100 000 obunachi ≈ 70 daqiqa. `BROADCAST_RATE` ni oshirish bloklanishga olib kelishi mumkin. |
@@ -279,6 +363,7 @@ src/lib/engine/             Bot mantiqi: update qayta ishlash va ekran chizish
 src/lib/telegram.ts         Telegram Bot API klienti
 src/lib/media.ts            Fayl yuklash va saqlash
 src/worker/index.ts         Broadcast worker (alohida jarayon)
+src/worker/poller.ts        Polling rejimi — domensiz ishlash
 src/worker/maintenance.ts   Agregatsiya, rejalar va tozalash
 public/track.js             Mini App'ga qo'yiladigan snippet
 ```

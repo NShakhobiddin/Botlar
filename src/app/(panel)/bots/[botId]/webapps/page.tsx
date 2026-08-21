@@ -23,10 +23,26 @@ export default async function WebAppsPage({
     webAppTopEvents(botId, 30),
   ]);
 
-  const appUrl = process.env.APP_URL ?? "https://panel.example.com";
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? "";
 
   return (
     <div className="space-y-5">
+      {!appUrl && (
+        <Card className="border-amber-500/25">
+          <div className="px-5 py-4">
+            <div className="eyebrow mb-1">Diqqat</div>
+            <p className="text-sm">Mini App uchun ochiq HTTPS manzil kerak</p>
+            <p className="mt-1 max-w-2xl text-xs text-muted">
+              Bot polling rejimida domensiz ishlaydi, lekin Telegram Mini App&apos;ni
+              faqat HTTPS orqali ochadi va statistika kodi ham shu manzilga yozadi. Bu
+              bo&apos;limdan foydalanish uchun{" "}
+              <span className="font-mono text-amber-400">APP_URL</span> ni ochiq manzilga
+              o&apos;rnating (tunnel ham bo&apos;ladi).
+            </p>
+          </div>
+        </Card>
+      )}
+
       {apps.length === 0 ? (
         <Card>
           <Empty

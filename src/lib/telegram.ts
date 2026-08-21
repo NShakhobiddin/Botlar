@@ -1,4 +1,9 @@
-const API = "https://api.telegram.org";
+/**
+ * Telegram Bot API manzili.
+ * O'zingizning Bot API serveringizni ishlatsangiz (katta fayllar uchun)
+ * TELEGRAM_API_URL orqali almashtiring.
+ */
+const API = (process.env.TELEGRAM_API_URL ?? "https://api.telegram.org").replace(/\/$/, "");
 
 export class TelegramError extends Error {
   constructor(
@@ -163,6 +168,20 @@ export const getWebhookInfo = (token: string) =>
     last_error_message?: string;
   }>(token, "getWebhookInfo");
 
+/** Long polling — webhook o'rniga. Domen va HTTPS talab qilmaydi. */
+export const getUpdates = (
+  token: string,
+  offset: number,
+  timeoutSec = 25,
+  allowed: string[] = ["message", "callback_query", "my_chat_member"]
+) =>
+  callApi<TgUpdate[]>(
+    token,
+    "getUpdates",
+    { offset, timeout: timeoutSec, allowed_updates: allowed },
+    (timeoutSec + 10) * 1000
+  );
+
 export const setMyCommands = (
   token: string,
   commands: { command: string; description: string }[]
@@ -191,11 +210,73 @@ export type SendOptions = {
   text: string;
   parseMode?: string;
   mediaType?: "NONE" | "PHOTO" | "VIDEO" | "DOCUMENT" | "ANIMATION";
+  /** URL yoki Telegram file_id. */
   mediaUrl?: string | null;
+  /** Diskdagi fayl — ochiq havola bo'lmaganda Telegram'ga to'g'ridan-to'g'ri yuklanadi. */
+  mediaFile?: { path: string; fileName: string } | null;
   replyMarkup?: unknown;
   disableNotification?: boolean;
   disableWebPagePreview?: boolean;
 };
+
+export type SendResult = {
+  message_id: number;
+  /** Fayl yuklangan bo'lsa — keyingi yuborishlarda qayta ishlatiladigan id. */
+  fileId?: string;
+};
+
+type MediaResult = {
+  message_id: number;
+  photo?: { file_id: string }[];
+  video?: { file_id: string };
+  document?: { file_id: string };
+  animation?: { file_id: string };
+};
+
+function extractFileId(r: MediaResult): string | undefined {
+  if (r.photo?.length) return r.photo[r.photo.length - 1].file_id;
+  return r.video?.file_id ?? r.document?.file_id ?? r.animation?.file_id;
+}
+
+/** Faylni multipart bilan yuklaydi — ochiq havola kerak emas. */
+async function uploadFile(
+  token: string,
+  method: string,
+  field: string,
+  file: { path: string; fileName: string },
+  fields: Record<string, unknown>
+): Promise<MediaResult> {
+  const { readFile } = await import("node:fs/promises");
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === undefined || v === null) continue;
+    form.append(k, typeof v === "object" ? JSON.stringify(v) : String(v));
+  }
+  form.append(field, new Blob([await readFile(file.path)]), file.fileName);
+
+  const res = await fetch(`${API}/bot${token}/${method}`, { method: "POST", body: form });
+  const raw = await res.text();
+  let json: { ok: boolean; result?: MediaResult; description?: string; error_code?: number };
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new TelegramError(
+      `${method}: Telegram JSON o'rniga ${res.status} javob qaytardi`,
+      res.status,
+      undefined,
+      method
+    );
+  }
+  if (!json.ok) {
+    throw new TelegramError(
+      json.description ?? "Fayl yuborilmadi",
+      json.error_code ?? res.status,
+      undefined,
+      method
+    );
+  }
+  return json.result!;
+}
 
 const MEDIA_METHOD: Record<string, { method: string; field: string }> = {
   PHOTO: { method: "sendPhoto", field: "photo" },
@@ -204,23 +285,32 @@ const MEDIA_METHOD: Record<string, { method: string; field: string }> = {
   ANIMATION: { method: "sendAnimation", field: "animation" },
 };
 
-/** Matn yoki media yuboradi — turini o'zi tanlaydi. */
-export async function send(
-  token: string,
-  o: SendOptions
-): Promise<{ message_id: number }> {
+/** Matn yoki media yuboradi — turini va yuborish usulini o'zi tanlaydi. */
+export async function send(token: string, o: SendOptions): Promise<SendResult> {
   const parse_mode = !o.parseMode || o.parseMode === "None" ? undefined : o.parseMode;
   const media = o.mediaType && o.mediaType !== "NONE" ? MEDIA_METHOD[o.mediaType] : null;
 
-  if (media && o.mediaUrl) {
-    return callApi(token, media.method, {
+  if (media) {
+    const common = {
       chat_id: o.chatId,
-      [media.field]: o.mediaUrl,
       caption: o.text ? o.text.slice(0, 1024) : undefined,
       parse_mode,
       reply_markup: o.replyMarkup,
       disable_notification: o.disableNotification,
-    });
+    };
+
+    if (o.mediaFile) {
+      const result = await uploadFile(token, media.method, media.field, o.mediaFile, common);
+      return { message_id: result.message_id, fileId: extractFileId(result) };
+    }
+
+    if (o.mediaUrl) {
+      const result = await callApi<MediaResult>(token, media.method, {
+        ...common,
+        [media.field]: o.mediaUrl,
+      });
+      return { message_id: result.message_id, fileId: extractFileId(result) };
+    }
   }
 
   return callApi(token, "sendMessage", {
