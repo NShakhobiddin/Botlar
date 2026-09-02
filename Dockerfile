@@ -34,6 +34,11 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
+# Yuklangan fayllar papkasi. Volume shu papkaga ulanadi va egaligini
+# undan meros qilib oladi — bo'lmasa konteyner root nomidan yaratib,
+# ilova unga yoza olmay qoladi.
+RUN mkdir -p /app/data/media && chown -R nextjs:nodejs /app/data
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0

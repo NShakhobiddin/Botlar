@@ -49,8 +49,19 @@ export async function storeFile(file: File): Promise<StoredFile> {
 
   const publicKey = `${randomToken(16)}.${spec.ext}`;
   const dir = mediaDir();
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, publicKey), Buffer.from(await file.arrayBuffer()));
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, publicKey), Buffer.from(await file.arrayBuffer()));
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EACCES" || code === "EPERM") {
+      throw new Error(
+        `Fayllar papkasiga yozib bo'lmadi (${dir}). Papka ruxsatlarini tekshiring.`
+      );
+    }
+    if (code === "ENOSPC") throw new Error("Diskda joy qolmadi");
+    throw err;
+  }
 
   return {
     publicKey,
