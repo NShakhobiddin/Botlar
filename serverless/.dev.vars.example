@@ -1,0 +1,7 @@
+# Mahalliy sinov uchun. Nusxa oling: cp .dev.vars.example .dev.vars
+BOT_TOKEN=123456789:sinov-tokeni
+ADMIN_PASSWORD=kamida-12-belgili-parol
+# Haqiqiy Telegram o'rniga soxta serverga yo'naltirish (ixtiyoriy)
+# TELEGRAM_API=http://127.0.0.1:8099
+ADMIN_IDS=
+BATCH_SIZE=40

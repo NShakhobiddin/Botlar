@@ -162,6 +162,16 @@ o'zgarmaydi.
 
 ---
 
+## Faqat ommaviy xabar kerak bo'lsa — serversiz variant
+
+`serverless/` papkasida alohida, ancha kichik vosita bor: Cloudflare Workers'ning
+bepul tarifida ishlaydi, server, domen va yoqiq kompyuter kerak emas. Kontent
+konstruktori va grafiklar yo'q — faqat obunachilar ro'yxati va ularga xabar
+yuborish (import, sinov, bo'laklab yuborish, bloklaganlarni ajratish, Telegram
+ichidan `/broadcast`). O'rnatish: [`serverless/README.md`](serverless/README.md).
+
+---
+
 ## Sizdan nima kerak
 
 **Polling rejimi uchun:**

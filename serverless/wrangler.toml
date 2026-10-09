@@ -1,0 +1,29 @@
+# Botlar — serverless ommaviy xabar yuboruvchi
+# Cloudflare Workers (bepul tarif) + D1 ma'lumotlar bazasi.
+
+name = "botlar-xabar"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "botlar"
+# `npx wrangler d1 create botlar` chiqargan database_id ni shu yerga qo'ying
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# Har daqiqada navbatdagi bo'lakni yuboradi — panel yopiq bo'lsa ham.
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+# Bir chaqiruvda nechta xabar yuborilsin.
+# Bepul tarif: bir chaqiruvda 50 ta tashqi so'rov — 40 xavfsiz.
+# Pullik tarifda (5$/oy) 1000 gacha oshirish mumkin.
+BATCH_SIZE = "40"
+TELEGRAM_API = "https://api.telegram.org"
+# Telegram ichidan /broadcast yubora oladiganlar (vergul bilan). Ixtiyoriy.
+ADMIN_IDS = ""
+
+# Maxfiy qiymatlar bu faylga YOZILMAYDI — ular buyruq bilan saqlanadi:
+#   npx wrangler secret put BOT_TOKEN
+#   npx wrangler secret put ADMIN_PASSWORD
