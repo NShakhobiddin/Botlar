@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ommaviy xabar</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  /* Ranglar Telegram mavzusidan olinadi — panel foydalanuvchining
+     Telegram'i bilan bir xil ko'rinadi. Qavs ichidagilar — brauzerda sinash uchun. */
+  :root {
+    --bg: var(--tg-theme-secondary-bg-color, #efeff4);
+    --section: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #ffffff));
+    --text: var(--tg-theme-text-color, #000000);
+    --hint: var(--tg-theme-hint-color, #8e8e93);
+    --link: var(--tg-theme-link-color, #2481cc);
+    --accent: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #2481cc));
+    --button: var(--tg-theme-button-color, #2481cc);
+    --button-text: var(--tg-theme-button-text-color, #ffffff);
+    --header: var(--tg-theme-section-header-text-color, var(--hint));
+    --danger: var(--tg-theme-destructive-text-color, #e53935);
+    --sep: var(--tg-theme-section-separator-color, rgba(128, 128, 128, .22));
+    --ok: #31a24c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 12px 0 calc(28px + env(safe-area-inset-bottom));
+  }
+  .wrap { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  .top { padding: 4px 16px 0; }
+  .top .bot { font-size: 13px; color: var(--hint); }
+  .top h1 { margin: 2px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group > .label { padding: 0 16px; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; color: var(--header); }
+  .group > .foot { padding: 0 16px; font-size: 13px; color: var(--hint); }
+  .section { background: var(--section); margin: 0 10px; border-radius: 12px; overflow: hidden; }
+  .pad { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; }
+  .stat { padding: 12px 14px; }
+  .stat:nth-child(odd) { border-right: 1px solid var(--sep); }
+  .stat:nth-child(-n+2) { border-bottom: 1px solid var(--sep); }
+  .stat .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .stat .k { font-size: 13px; color: var(--hint); }
+
+  textarea, input {
+    width: 100%; font: inherit; color: var(--text); background: transparent;
+    border: 1px solid var(--sep); border-radius: 10px; padding: 10px 12px; outline: none;
+  }
+  textarea { resize: vertical; min-height: 44px; }
+  textarea:focus, input:focus { border-color: var(--button); }
+  ::placeholder { color: var(--hint); opacity: 1; }
+  .field-hint { font-size: 12.5px; color: var(--hint); margin-top: -4px; }
+
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 12px 14px;
+    cursor: pointer; width: 100%; transition: opacity .15s;
+  }
+  button:disabled { opacity: .45; pointer-events: none; }
+  .primary { background: var(--button); color: var(--button-text); }
+  .secondary { background: transparent; color: var(--link); border: 1px solid var(--sep); }
+  .danger { background: transparent; color: var(--danger); border: 1px solid var(--sep); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  :focus-visible { outline: 2px solid var(--button); outline-offset: 2px; }
+
+  .bubble {
+    align-self: flex-start; max-width: 88%; background: var(--bg); border-radius: 14px 14px 14px 4px;
+    padding: 8px 11px; font-size: 14px; white-space: pre-wrap; word-break: break-word;
+  }
+  .bubble img { display: block; max-width: 100%; border-radius: 10px; margin: -2px -3px 6px; }
+  .kb { display: flex; flex-direction: column; gap: 4px; max-width: 88%; }
+  .kb div { background: var(--bg); color: var(--link); text-align: center; border-radius: 9px; padding: 7px; font-size: 13.5px; }
+
+  .bar { height: 6px; border-radius: 99px; background: var(--bg); overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--button); border-radius: 99px; transition: width .4s; }
+  .counts { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; }
+  .counts b { font-variant-numeric: tabular-nums; }
+
+  .msg { font-size: 13.5px; border-radius: 10px; padding: 9px 12px; }
+  .msg.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+  .msg.err { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+  .msg:empty { display: none; }
+
+  .list-item { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-top: 1px solid var(--sep); }
+  .list-item:first-child { border-top: 0; }
+  .list-item .main { flex: 1; min-width: 0; }
+  .list-item .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-item .sub { font-size: 13px; color: var(--hint); font-variant-numeric: tabular-nums; }
+  .tag { font-size: 12px; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+  .tag.done { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+  .tag.running { color: var(--button); background: color-mix(in srgb, var(--button) 13%, transparent); }
+  .tag.cancelled { color: var(--hint); background: var(--bg); }
+
+  .gate { margin: 40px 16px; text-align: center; display: flex; flex-direction: column; gap: 10px; }
+  .gate h2 { margin: 0; font-size: 19px; }
+  .gate p { margin: 0; color: var(--hint); font-size: 14px; }
+  .gate code { font: 600 15px ui-monospace, Menlo, monospace; color: var(--text); background: var(--section); padding: 3px 8px; border-radius: 6px; }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate" hidden>
+  <h2 id="gateTitle">Yuklanmoqda…</h2>
+  <p id="gateText"></p>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div class="top">
+    <div class="bot" id="botName"></div>
+    <h1>Ommaviy xabar</h1>
+  </div>
+
+  <div class="group">
+    <div class="section stats">
+      <div class="stat"><div class="k">Jami obunachi</div><div class="v" id="sTotal">—</div></div>
+      <div class="stat"><div class="k">Xabar oladi</div><div class="v" id="sActive" style="color:var(--ok)">—</div></div>
+      <div class="stat"><div class="k">Bloklagan</div><div class="v" id="sBlocked" style="color:var(--danger)">—</div></div>
+      <div class="stat"><div class="k">Import qilingan</div><div class="v" id="sImported">—</div></div>
+    </div>
+  </div>
+
+  <div class="group" id="progress" hidden>
+    <div class="label">Yuborilmoqda</div>
+    <div class="section pad">
+      <div style="display:flex;justify-content:space-between;font-size:14px">
+        <span id="pCount">0 / 0</span><b id="pPct">0%</b>
+      </div>
+      <div class="bar"><div id="pBar"></div></div>
+      <div class="counts">
+        <span>Yetdi <b id="pSent" style="color:var(--ok)">0</b></span>
+        <span>Bloklagan <b id="pBlocked" style="color:var(--danger)">0</b></span>
+        <span>Xato <b id="pFailed">0</b></span>
+      </div>
+      <button class="danger" id="cancelBtn" type="button">To'xtatish</button>
+    </div>
+    <div class="foot" id="pNote">Panel ochiq turganda yuboriladi. Yopsangiz to'xtaydi — qayta ochsangiz shu joydan davom etadi.</div>
+  </div>
+
+  <div class="group">
+    <div class="label">Yangi xabar</div>
+    <div class="section pad">
+      <textarea id="text" rows="5" placeholder="Xabar matni…"></textarea>
+      <div class="field-hint">&lt;b&gt;qalin&lt;/b&gt;, &lt;i&gt;kursiv&lt;/i&gt;, &lt;a href="…"&gt;havola&lt;/a&gt;</div>
+      <input id="photo" placeholder="Rasm havolasi — ixtiyoriy" inputmode="url">
+      <textarea id="buttons" rows="2" placeholder="Tugma: Batafsil | https://example.uz"></textarea>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Ko'rinishi</div>
+    <div class="section pad">
+      <div class="bubble" id="preview"></div>
+      <div class="kb" id="previewKb"></div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="section pad">
+      <div class="msg" id="composeMsg"></div>
+      <div class="row">
+        <button class="secondary" id="testBtn" type="button">O'zimga sinov</button>
+        <button class="primary" id="sendBtn" type="button">Hammaga yuborish</button>
+      </div>
+    </div>
+    <div class="foot" id="eta"></div>
+  </div>
+
+  <div class="group">
+    <div class="label">Eski obunachilar</div>
+    <div class="section pad">
+      <textarea id="importText" rows="4" placeholder="Har qatorda bitta Telegram ID yoki CSV"></textarea>
+      <div class="msg" id="importMsg"></div>
+      <button class="secondary" id="importBtn" type="button">Ro'yxatga qo'shish</button>
+    </div>
+    <div class="foot">Telegram obunachilar ro'yxatini bermaydi — u eski botingiz bazasida. Takroriy ID'lar o'tkazib yuboriladi.</div>
+  </div>
+
+  <div class="group">
+    <div class="label">/start javobi</div>
+    <div class="section pad">
+      <textarea id="welcome" rows="5"></textarea>
+      <div class="msg" id="welcomeMsg"></div>
+      <button class="secondary" id="welcomeBtn" type="button">Saqlash</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Tarix</div>
+    <div class="section" id="history">
+      <div class="list-item"><div class="main sub">Hali xabar yuborilmagan</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => Number(n || 0).toLocaleString("ru-RU");
+let state = null;
+let looping = false;
+
+tg?.ready();
+tg?.expand();
+
+// Serverless endpoint'ni Promise ko'rinishida chaqirish
+function call(name, input = {}) {
+  return new Promise((resolve, reject) => {
+    if (!tg?.Serverless) return reject({ message: "Panelni Telegram ichida oching" });
+    tg.Serverless.call(name, input, (err, result) => (err ? reject(err) : resolve(result)));
+  });
+}
+
+function show(el, kind, text) {
+  el.className = "msg " + kind;
+  el.textContent = text || "";
+}
+
+function confirmAsk(text) {
+  return new Promise((ok) => (tg?.showConfirm ? tg.showConfirm(text, ok) : ok(window.confirm(text))));
+}
+
+function gate(title, text) {
+  $("app").hidden = true;
+  $("gate").hidden = false;
+  $("gateTitle").textContent = title;
+  $("gateText").innerHTML = text;
+}
+
+// ------------------------------------------------------------------ chizish
+
+function render() {
+  const s = state.stats;
+  $("botName").textContent = state.bot ? "@" + state.bot.username : "";
+  $("sTotal").textContent = fmt(s.total);
+  $("sActive").textContent = fmt(s.active);
+  $("sBlocked").textContent = fmt(s.blocked);
+  $("sImported").textContent = fmt(s.imported);
+  const minutes = Math.ceil((s.active || 0) / state.rate / 60);
+  $("eta").textContent = s.active
+    ? fmt(s.active) + " ta obunachiga · taxminan " + (minutes <= 1 ? "1 daqiqa" : fmt(minutes) + " daqiqa") + " (panel ochiq turishi kerak)"
+    : "";
+  if (!$("welcome").dataset.touched) $("welcome").value = state.welcome;
+
+  const box = $("history");
+  if (state.history.length) {
+    box.replaceChildren(...state.history.map((h) => {
+      const item = document.createElement("div");
+      item.className = "list-item";
+      const main = document.createElement("div");
+      main.className = "main";
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent = h.kind === "copy" ? "Telegram'dan nusxa" : (h.text || "rasm").replace(/<[^>]+>/g, "");
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      const d = new Date(h.created_at * 1000);
+      sub.textContent = d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) +
+        " · yetdi " + fmt(h.sent) + " · bloklagan " + fmt(h.blocked) + (h.failed ? " · xato " + fmt(h.failed) : "");
+      main.append(title, sub);
+      const tag = document.createElement("span");
+      tag.className = "tag " + h.status;
+      tag.textContent = { done: "yuborildi", running: "ketmoqda", cancelled: "to'xtatilgan" }[h.status];
+      item.append(main, tag);
+      return item;
+    }));
+  }
+  showJob(state.current);
+}
+
+function showJob(job) {
+  const running = !!job && job.status === "running";
+  $("progress").hidden = !running;
+  $("sendBtn").disabled = running;
+  if (running) tg?.enableClosingConfirmation?.(); else tg?.disableClosingConfirmation?.();
+  if (!running) return;
+  const done = job.sent + job.blocked + job.failed;
+  const pct = job.total ? Math.min(100, (done / job.total) * 100) : 0;
+  $("pCount").textContent = fmt(done) + " / " + fmt(job.total);
+  $("pPct").textContent = Math.floor(pct) + "%";
+  $("pBar").style.width = pct + "%";
+  $("pSent").textContent = fmt(job.sent);
+  $("pBlocked").textContent = fmt(job.blocked);
+  $("pFailed").textContent = fmt(job.failed);
+  if (!looping) loop();
+}
+
+// Panel ochiq ekan, navbatdagi bo'laklarni so'rab turadi.
+async function loop() {
+  looping = true;
+  try {
+    while (true) {
+      const r = await call("tick");
+      if (r.note) $("pNote").textContent = r.note;
+      if (!r.job || r.job.status !== "running") break;
+      showJob(r.job);
+      await new Promise((ok) => setTimeout(ok, Math.max(250, r.waitMs || 0)));
+    }
+    tg?.HapticFeedback?.notificationOccurred("success");
+  } catch (e) {
+    $("pNote").textContent = "Uzilish: " + (e.message || e) + ". Panelni qayta oching — shu joydan davom etadi.";
+  } finally {
+    looping = false;
+    await load(true).catch(() => {});
+  }
+}
+
+async function load(fresh = false) {
+  state = await call("state", { fresh });
+  $("gate").hidden = true;
+  $("app").hidden = false;
+  render();
+}
+
+// ------------------------------------------------------------------ ko'rinish
+
+function esc(s) { return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]); }
+function preview() {
+  const text = $("text").value;
+  const photo = $("photo").value.trim();
+  const box = $("preview");
+  box.replaceChildren();
+  if (/^https?:\/\//.test(photo)) {
+    const img = document.createElement("img");
+    img.src = photo; img.alt = ""; img.onerror = () => img.remove();
+    box.appendChild(img);
+  }
+  const span = document.createElement("span");
+  if (text.trim()) {
+    // Telegram qo'llaydigan oddiy teglargina ko'rinishda qoladi
+    span.innerHTML = esc(text).replace(/&lt;(\/?)(b|i|u|s|code|strong|em)&gt;/g, "<$1$2>");
+  } else {
+    span.textContent = photo ? "" : "Matn kiritilmagan";
+    span.style.color = "var(--hint)";
+  }
+  box.appendChild(span);
+  $("previewKb").replaceChildren(...$("buttons").value.split("\n").map((line) => {
+    const [t, u] = line.split("|").map((x) => (x || "").trim());
+    if (!t || !u) return null;
+    const d = document.createElement("div");
+    d.textContent = t;
+    return d;
+  }).filter(Boolean));
+}
+["text", "photo", "buttons"].forEach((id) => $(id).addEventListener("input", preview));
+preview();
+
+// ------------------------------------------------------------------ amallar
+
+const draft = () => ({ text: $("text").value, photo: $("photo").value, buttons: $("buttons").value });
+
+$("testBtn").onclick = async () => {
+  $("testBtn").disabled = true;
+  try {
+    await call("test", draft());
+    show($("composeMsg"), "ok", "Sinov xabari sizga yuborildi — chatni tekshiring");
+    tg?.HapticFeedback?.notificationOccurred("success");
+  } catch (e) {
+    show($("composeMsg"), "err", e.message);
+  }
+  $("testBtn").disabled = false;
+};
+
+$("sendBtn").onclick = async () => {
+  const n = state.stats.active;
+  const ok = await confirmAsk(fmt(n) + " ta obunachiga yuboriladi. Buni qaytarib bo'lmaydi. Avval o'zingizga sinov yubordingizmi?");
+  if (!ok) return;
+  $("sendBtn").disabled = true;
+  try {
+    const r = await call("start", draft());
+    show($("composeMsg"), "ok", "Yuborish boshlandi");
+    showJob(r.job);
+  } catch (e) {
+    show($("composeMsg"), "err", e.message);
+    $("sendBtn").disabled = false;
+  }
+};
+
+$("cancelBtn").onclick = async () => {
+  if (!(await confirmAsk("Yuborish to'xtatilsinmi? Qolganlarga xabar bormaydi."))) return;
+  await call("cancel").catch(() => {});
+  await load(true);
+};
+
+$("importBtn").onclick = async () => {
+  const ids = [];
+  for (const line of $("importText").value.split(/\r?\n/)) {
+    const m = line.match(/(^|[^\d-])(\d{5,15})(?!\d)/);
+    if (m) ids.push(m[2]);
+  }
+  const unique = [...new Set(ids)];
+  if (!unique.length) return show($("importMsg"), "err", "Ro'yxatda ID topilmadi");
+  $("importBtn").disabled = true;
+  let added = 0;
+  try {
+    for (let i = 0; i < unique.length; i += 2000) {
+      const r = await call("importIds", { ids: unique.slice(i, i + 2000) });
+      added += r.added;
+      show($("importMsg"), "ok", "Qo'shilmoqda… " + fmt(Math.min(i + 2000, unique.length)) + " / " + fmt(unique.length));
+    }
+    const skipped = unique.length - added;
+    show($("importMsg"), "ok", fmt(added) + " ta yangi obunachi qo'shildi" + (skipped ? ", " + fmt(skipped) + " tasi avval bor edi" : ""));
+    $("importText").value = "";
+    await load(true);
+  } catch (e) {
+    show($("importMsg"), "err", e.message);
+  }
+  $("importBtn").disabled = false;
+};
+
+$("welcome").addEventListener("input", () => { $("welcome").dataset.touched = "1"; });
+$("welcomeBtn").onclick = async () => {
+  try {
+    await call("welcome", { text: $("welcome").value });
+    show($("welcomeMsg"), "ok", "Saqlandi");
+  } catch (e) {
+    show($("welcomeMsg"), "err", e.message);
+  }
+};
+
+// ------------------------------------------------------------------ boshlash
+
+load().catch((e) => {
+  if (e?.parameters?.code === "FORBIDDEN") {
+    const id = e.parameters.userId;
+    gate("Bu panel faqat adminlar uchun",
+      "Admin bo'lish uchun <b>tgcloud/lib/config.js</b> dagi <b>ADMIN_IDS</b> ga ID'ingizni qo'shib, qayta push qiling." +
+      (id ? "<br><br>Sizning ID'ingiz: <code>" + Number(id) + "</code>" : ""));
+  } else {
+    gate("Panel ochilmadi", (e?.message || "Noma'lum xato") + ". Panel Telegram ichida ochilishi kerak.");
+  }
+});
+</script>
+</body>
+</html>

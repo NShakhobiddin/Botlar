@@ -162,7 +162,19 @@ o'zgarmaydi.
 
 ---
 
-## Faqat ommaviy xabar kerak bo'lsa — serversiz variant
+## Faqat ommaviy xabar kerak bo'lsa — serversiz variantlar
+
+Ikkita alohida, kichik vosita bor. Ikkalasi ham faqat obunachilar ro'yxati va
+ularga xabar yuborish uchun:
+
+- [`telegram-serverless/`](telegram-serverless/README.md) — **Telegram'ning o'z
+  Serverless platformasida** (BotFather → Serverless). Panel Telegram ichida
+  Mini App bo'lib ochiladi, tashqi akkaunt kerak emas. Xabar panel ochiq
+  turganda yuboriladi.
+- `serverless/` — **Cloudflare Workers**'da. Panel oddiy sayt, xabar sahifa
+  yopiq bo'lsa ham har daqiqada davom etadi.
+
+### Cloudflare varianti
 
 `serverless/` papkasida alohida, ancha kichik vosita bor: Cloudflare Workers'ning
 bepul tarifida ishlaydi, server, domen va yoqiq kompyuter kerak emas. Kontent

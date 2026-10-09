@@ -1,0 +1,17 @@
+{
+  "name": "botlar-telegram-serverless",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ommaviy xabar yuboruvchi — Telegram'ning o'z Serverless platformasida",
+  "type": "module",
+  "scripts": {
+    "login": "tgcloud login",
+    "status": "tgcloud status",
+    "push": "tgcloud push",
+    "migrate": "tgcloud migrate",
+    "deploy": "tgcloud push && tgcloud migrate"
+  },
+  "devDependencies": {
+    "@tgcloud/cli": "^0.2.0"
+  }
+}
